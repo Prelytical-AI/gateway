@@ -1,0 +1,196 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Prelytical Secure SQL Gateway - Windows SQL Server test VM
+
+Parameters:
+  KeyPairName:
+    Type: String
+    Default: Dev-Mac
+    Description: EC2 key pair name for Windows password decryption
+
+  InstanceType:
+    Type: String
+    Default: t3.xlarge
+    AllowedValues:
+      - t3.large
+      - t3.xlarge
+      - t3.2xlarge
+    Description: Size for Windows + SQL Server + Ollama testing
+
+  AllowedRdpCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: CIDR allowed to connect via RDP (restrict to your IP in production)
+
+  ReadOnlyPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 12
+    Default: PrelyticalTest!2026
+    Description: Password for prelytical_readonly SQL login (also stored in SSM)
+
+  SqlAmiId:
+    Type: AWS::EC2::Image::Id
+    Default: ami-0ffa0f075391b705d
+    Description: Windows Server 2022 + SQL Server 2022 Express AMI (us-east-1)
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for the test instance
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet for the test instance
+
+Resources:
+  BootstrapBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: prelytical-gateway-test
+
+  BootstrapBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BootstrapBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowEc2ReadBootstrap
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt Ec2Role.Arn
+            Action:
+              - s3:GetObject
+            Resource: !Sub "${BootstrapBucket.Arn}/*"
+
+  ReadOnlyPasswordParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/prelytical/gateway-test/${AWS::StackName}/readonly-password"
+      Type: String
+      Value: !Ref ReadOnlyPassword
+      Description: SQL read-only login password for gateway test VM
+
+  Ec2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: ReadBootstrapBucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt BootstrapBucket.Arn
+                  - !Sub "${BootstrapBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/prelytical/gateway-test/${AWS::StackName}/*"
+
+  Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref Ec2Role
+
+  TestVmSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Prelytical gateway SQL test VM
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3389
+          ToPort: 3389
+          CidrIp: !Ref AllowedRdpCidr
+          Description: RDP
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-sg"
+
+  TestVm:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref SqlAmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref Ec2InstanceProfile
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          SubnetId: !Ref SubnetId
+          GroupSet:
+            - !Ref TestVmSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 120
+            VolumeType: gp3
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-sql-test"
+        - Key: Project
+          Value: prelytical-gateway-test
+      UserData:
+        Fn::Base64: !Sub |
+          <powershell>
+          New-Item -ItemType Directory -Force -Path C:\PrelyticalBootstrap | Out-Null
+          "UserData started $(Get-Date -Format o)" | Out-File C:\PrelyticalBootstrap\userdata-started.txt
+          </powershell>
+
+Outputs:
+  InstanceId:
+    Description: EC2 instance ID
+    Value: !Ref TestVm
+
+  PublicIp:
+    Description: Public IP for RDP
+    Value: !GetAtt TestVm.PublicIp
+
+  BootstrapBucketName:
+    Description: S3 bucket for bootstrap scripts
+    Value: !Ref BootstrapBucket
+
+  ReadOnlyPasswordParameterName:
+    Description: SSM parameter containing read-only SQL password
+    Value: !Ref ReadOnlyPasswordParameter
+
+  DatabaseName:
+    Description: Seeded SQL Server database
+    Value: PrelyticalDemoDW
+
+  SqlLogin:
+    Description: Read-only SQL login for gateway
+    Value: prelytical_readonly
+
+  RdpHost:
+    Description: RDP target
+    Value: !GetAtt TestVm.PublicIp
+
+  ConnectionNotes:
+    Description: Post-deploy instructions file on the VM
+    Value: C:\PrelyticalBootstrap\README.txt

@@ -149,6 +149,7 @@ python -m venv .venv
 
 ## Documentation
 
+- [AWS test VM](docs/TEST_VM.md) — provision a Windows SQL Server EC2 for fresh install testing
 - [Same-VM POC guide](docs/SAME_VM_SQLSERVER_OLLAMA_POC.md) — full walkthrough
 - [Client demo script](docs/CLIENT_TEST_SCRIPT.md)
 - [Security model](docs/SECURITY_MODEL.md)
