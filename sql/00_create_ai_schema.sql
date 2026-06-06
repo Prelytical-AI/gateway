@@ -1,0 +1,5 @@
+IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'ai')
+BEGIN
+    EXEC('CREATE SCHEMA ai');
+END
+GO
