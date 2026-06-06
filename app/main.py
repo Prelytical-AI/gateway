@@ -14,6 +14,7 @@ from app.services.audit import AuditService
 from app.services.guardrails import ValidationResult, validate_sql
 from app.services.model_client import ModelClient
 from app.services.brief_builder import build_brief_prompt, parse_brief_json
+from app.services.brief_renderer import normalize_and_render_brief
 from app.services.prompt_builder import (
     build_blocked_answer,
     build_sql_generation_prompt,
@@ -145,7 +146,14 @@ def create_app() -> FastAPI:
                 database_name=settings.sqlserver_database,
             )
             raw = model_client.generate_brief(system_prompt, user_prompt)
-            output = parse_brief_json(raw)
+            parsed = parse_brief_json(raw)
+            output = normalize_and_render_brief(
+                parsed,
+                title=request.title.strip(),
+                objective=request.objective.strip(),
+                database_name=settings.sqlserver_database,
+                schema_metadata=schema_metadata,
+            )
             audit.log_event(
                 "brief_generated",
                 question=request.objective,

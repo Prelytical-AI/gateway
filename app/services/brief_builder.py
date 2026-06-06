@@ -141,9 +141,17 @@ def build_brief_prompt(
         f"{_json(domains)}\n\n"
         "SOURCE CONTEXT JSON:\n"
         f"{_json([artifact])}\n\n"
-        "Return only valid JSON matching the Prelytical brief contract. The html_report field "
-        "must be a complete standalone HTML document beginning with <!doctype html>, including "
-        "its own embedded CSS, and requiring no external stylesheet to look polished."
+        "Return only valid JSON matching the Prelytical brief contract.\n\n"
+        "IMPORTANT for on-prem gateway:\n"
+        "- Focus on rich structured fields; the server renders the HTML report.\n"
+        "- Include readiness_score and confidence_score (0-100).\n"
+        "- Include 4-6 top_signal_opportunities. Each MUST have:\n"
+        "  title, description, business_value, feasibility, privacy_risk, time_to_insight,\n"
+        "  value_score, feasibility_score, privacy_risk_score, overall_score,\n"
+        "  example_insights (array of executive questions), indicators (array of field/table names),\n"
+        "  why_it_matters, required_data, caveats, recommended_next_step.\n"
+        "- Include deep_dive_prompts with title, prompt_text, intended_use.\n"
+        "- Set html_report to an empty string \"\" if unsure; do not return minimal unstyled HTML.\n"
     )
 
     return load_brief_system_prompt(), user_prompt
