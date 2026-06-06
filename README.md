@@ -9,14 +9,16 @@ A same-VM POC for running AI against sensitive SQL Server data using:
 - Local audit logging
 - Browser UI at `http://localhost:8080`
 
-This gateway lives in the `gateway/` folder alongside the cloud Prelytical platform (`../platform/`) and public marketing site (`../public-site/`). It is a **self-contained on-premises deployment** for environments where data cannot leave the VM.
+This is a **standalone repository** for on-premises installs. It also appears as the `gateway/` submodule inside the [Prelytical workspace](https://github.com/Prelytical-AI/prelytical) alongside the cloud platform and public site.
 
 ## Test Today (Windows VM)
 
 Open PowerShell as Administrator:
 
 ```powershell
-cd C:\Projects\prelytical\gateway
+cd C:\Projects
+git clone https://github.com/Prelytical-AI/gateway.git
+cd gateway
 
 .\install\check_vm_readiness.ps1
 .\install\install_ollama_windows.ps1
@@ -37,14 +39,15 @@ Open **http://localhost:8080**
 ## Project layout
 
 ```text
-prelytical/
-  gateway/
-    app/           FastAPI backend + static UI
-    install/       Windows PowerShell setup scripts
-    sql/           SQL Server schema, login, demo views
-    docs/          POC guide, security model, troubleshooting
-    tests/         Guardrail and prompt unit tests
+gateway/
+  app/           FastAPI backend + static UI
+  install/       Windows PowerShell setup scripts
+  sql/           SQL Server schema, login, demo views
+  docs/          POC guide, security model, troubleshooting
+  tests/         Guardrail and prompt unit tests
 ```
+
+**Repository:** https://github.com/Prelytical-AI/gateway
 
 ## API endpoints
 

@@ -24,12 +24,8 @@ Open **PowerShell as Administrator**:
 
 ```powershell
 cd C:\Projects
-# Clone or copy the prelytical workspace:
-#   prelytical/public-site
-#   prelytical/platform
-#   prelytical/gateway
-
-cd C:\Projects\prelytical\gateway
+git clone https://github.com/Prelytical-AI/gateway.git
+cd gateway
 
 .\install\check_vm_readiness.ps1
 
