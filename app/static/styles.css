@@ -24,33 +24,53 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.25rem 2rem;
-  background: linear-gradient(135deg, #0f2744, #16365c);
-  color: #fff;
+  padding: 1rem 2rem;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
   box-shadow: var(--shadow);
 }
 
 .header-brand {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .brand-logo {
-  height: 40px;
-  width: auto;
+  width: 168px;
+  height: auto;
+  max-height: 44px;
   display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-left: 1.25rem;
+  border-left: 1px solid var(--border);
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.35rem;
-  font-weight: 600;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
 }
 
 .subtitle {
-  margin: 0.25rem 0 0;
-  color: #c7d6ea;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.header-actions .btn.secondary {
+  background: var(--surface);
 }
 
 .container {
