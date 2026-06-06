@@ -14,6 +14,7 @@ from app.services.audit import AuditService
 from app.services.guardrails import ValidationResult, validate_sql
 from app.services.model_client import ModelClient
 from app.services.brief_builder import build_brief_prompt, parse_brief_json
+from app.services.brief_export import export_brief_html
 from app.services.brief_renderer import normalize_and_render_brief
 from app.services.prompt_builder import (
     build_blocked_answer,
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
             "max_rows": settings.sqlserver_max_rows,
             "model_skip_summarization": settings.model_skip_summarization,
             "model_timeout_seconds": settings.model_timeout_seconds,
+            "brief_export_configured": bool(settings.brief_export_path.strip()),
         }
 
     @app.get("/api/schema")
@@ -154,6 +156,12 @@ def create_app() -> FastAPI:
                 database_name=settings.sqlserver_database,
                 schema_metadata=schema_metadata,
             )
+            export_path, export_error = export_brief_html(
+                output.get("html_report", ""),
+                export_dir=settings.brief_export_path,
+                title=request.title.strip(),
+                database_name=settings.sqlserver_database,
+            )
             audit.log_event(
                 "brief_generated",
                 question=request.objective,
@@ -161,6 +169,8 @@ def create_app() -> FastAPI:
                     "title": request.title,
                     "readiness_score": output.get("readiness_score"),
                     "confidence_score": output.get("confidence_score"),
+                    "export_path": export_path,
+                    "export_error": export_error,
                 },
             )
             return {
@@ -170,6 +180,8 @@ def create_app() -> FastAPI:
                 "readiness_score": output.get("readiness_score"),
                 "confidence_score": output.get("confidence_score"),
                 "html_report": output.get("html_report", ""),
+                "export_path": export_path,
+                "export_error": export_error,
             }
         except Exception as exc:
             logger.exception("Brief generation failed")

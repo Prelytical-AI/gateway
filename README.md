@@ -88,6 +88,22 @@ Use your real database name and the same password as in `01_create_readonly_logi
 
 Open **http://localhost:8080** — status cards should show SQL and Model connected.
 
+### Export briefs off the VM
+
+Set an auto-export folder in `.env` (created if missing). Each generated brief is saved as a timestamped `.html` file:
+
+```env
+BRIEF_EXPORT_PATH=C:\PrelyticalExports\briefs
+```
+
+UNC share example:
+
+```env
+BRIEF_EXPORT_PATH=\\fileserver\reports\prelytical
+```
+
+The UI shows the saved path after generation. Download HTML still works for ad-hoc copies.
+
 ## Production: GPU inference VM (Option 2)
 
 For faster responses, run Ollama on a **separate Linux GPU VM** on the same private network. The gateway stays on the SQL Server VM; only `MODEL_BASE_URL` changes.

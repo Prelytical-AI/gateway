@@ -124,6 +124,18 @@ async function generateBrief() {
     $("brief-summary").textContent = result.executive_summary || "";
     lastBriefHtml = result.html_report || "";
     $("brief-frame").srcdoc = lastBriefHtml || "<p>No HTML report returned.</p>";
+    const exportNotice = $("brief-export-notice");
+    if (result.export_path) {
+      exportNotice.textContent = `Saved to server export path: ${result.export_path}`;
+      exportNotice.classList.remove("hidden", "export-error");
+    } else if (result.export_error) {
+      exportNotice.textContent = result.export_error;
+      exportNotice.classList.remove("hidden");
+      exportNotice.classList.add("export-error");
+    } else {
+      exportNotice.classList.add("hidden");
+      exportNotice.textContent = "";
+    }
     markChecklist("brief", true);
   } catch (err) {
     alert(`${err.message}\n\nTry warm_ollama_model.ps1 first and increase BRIEF_TIMEOUT_SECONDS in .env.`);

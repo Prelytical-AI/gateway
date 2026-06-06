@@ -284,6 +284,22 @@ th {
   margin-top: 0.75rem;
 }
 
+.brief-export-notice {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: #ecfdf3;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  color: #067647;
+  word-break: break-all;
+}
+
+.brief-export-notice.export-error {
+  background: #fef3f2;
+  border-color: #fecdca;
+  color: #b42318;
+}
+
 input[type="text"] {
   width: 100%;
   padding: 0.65rem 0.75rem;

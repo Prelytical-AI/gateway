@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     model_skip_summarization: bool = Field(default=True, alias="MODEL_SKIP_SUMMARIZATION")
     model_max_schema_objects: int = Field(default=40, alias="MODEL_MAX_SCHEMA_OBJECTS")
     brief_timeout_seconds: int = Field(default=900, alias="BRIEF_TIMEOUT_SECONDS")
+    brief_export_path: str = Field(default="", alias="BRIEF_EXPORT_PATH")
 
     audit_db_path: str = Field(default="./prelytical_audit.sqlite3", alias="AUDIT_DB_PATH")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
