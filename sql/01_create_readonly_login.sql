@@ -26,5 +26,10 @@ GO
 GRANT SELECT ON SCHEMA::[ai] TO [prelytical_readonly];
 GO
 
+-- Optional: full read access to dbo (typical on a trusted VM).
+-- Or run sql/02_grant_dbo_readonly.sql separately.
+-- GRANT SELECT ON SCHEMA::[dbo] TO [prelytical_readonly];
+-- GO
+
 DENY INSERT, UPDATE, DELETE, ALTER, CONTROL TO [prelytical_readonly];
 GO
