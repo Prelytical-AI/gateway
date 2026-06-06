@@ -23,12 +23,47 @@ Mention when results may be limited by TOP/row caps.
 Do not invent numbers not present in the results."""
 
 
+def compact_schema_metadata(
+    schema_metadata: Dict[str, Any],
+    max_objects: int = 40,
+) -> Dict[str, Any]:
+    """Limit schema sent to the LLM — large dbo catalogs stall CPU inference."""
+    remaining = max(max_objects, 1)
+    compact_schemas: List[Dict[str, Any]] = []
+    total_objects = sum(len(s.get("objects", [])) for s in schema_metadata.get("schemas", []))
+
+    for schema in schema_metadata.get("schemas", []):
+        if remaining <= 0:
+            break
+        objects = schema.get("objects", [])
+        take = objects[:remaining]
+        remaining -= len(take)
+        entry: Dict[str, Any] = {
+            "schema": schema["schema"],
+            "objects": take,
+        }
+        if len(objects) > len(take):
+            entry["truncated"] = True
+            entry["total_objects_in_schema"] = len(objects)
+        compact_schemas.append(entry)
+
+    result: Dict[str, Any] = {"schemas": compact_schemas}
+    if total_objects > max_objects:
+        result["note"] = (
+            f"Schema truncated to {max_objects} of {total_objects} objects for model performance. "
+            "Name specific tables in your question if needed."
+        )
+    return result
+
+
 def build_sql_generation_prompt(
     question: str,
     schema_metadata: Dict[str, Any],
     max_rows: int,
+    max_schema_objects: int = 40,
 ) -> tuple[str, str]:
-    schema_json = json.dumps(schema_metadata, indent=2)
+    compact = compact_schema_metadata(schema_metadata, max_objects=max_schema_objects)
+    schema_json = json.dumps(compact, indent=2)
     user_prompt = f"""User question:
 {question}
 

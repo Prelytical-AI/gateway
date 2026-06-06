@@ -19,7 +19,9 @@ class ModelClient:
         self.base_url = self.config.model_base_url.rstrip("/")
         self.timeout = self.config.model_timeout_seconds
 
-    def test_model_connection(self) -> tuple[bool, str]:
+    def test_model_connection(self, *, full_chat: bool = False) -> tuple[bool, str]:
+        if not full_chat:
+            return self.ping()
         try:
             response = self.chat(
                 system="You are a helpful assistant.",
@@ -32,6 +34,42 @@ class ModelClient:
         except Exception as exc:
             logger.exception("Model connection test failed")
             return False, str(exc)
+
+    def ping(self) -> tuple[bool, str]:
+        root = self.base_url.removesuffix("/v1").rstrip("/")
+        url = f"{root}/api/tags"
+        try:
+            response = requests.get(url, timeout=15)
+        except requests.exceptions.ConnectionError as exc:
+            return False, (
+                f"Cannot connect to Ollama at {self.base_url}. "
+                "Ensure Ollama is running."
+            )
+        except requests.exceptions.Timeout:
+            return False, "Ollama tags check timed out (15s). Model may still be loading."
+
+        if response.status_code >= 400:
+            return False, f"Ollama API error ({response.status_code})"
+
+        try:
+            data = response.json()
+            names = [m.get("name", "") for m in data.get("models", [])]
+        except (ValueError, TypeError):
+            return False, "Unexpected response from Ollama /api/tags"
+
+        if not names:
+            return False, f"No models pulled on Ollama host. Run: ollama pull {self.config.model_name}"
+
+        configured = self.config.model_name
+        if configured in names or any(n.startswith(f"{configured}:") or n == configured for n in names):
+            return True, f"Ollama ready ({configured})."
+        if any(configured in n for n in names):
+            return True, f"Ollama ready (model family: {configured})."
+
+        return False, (
+            f"Ollama is up but '{configured}' not found. "
+            f"Available: {', '.join(names[:5])}"
+        )
 
     def generate_sql(self, system: str, user: str) -> str:
         content = self.chat(system=system, user=user, temperature=0.1)

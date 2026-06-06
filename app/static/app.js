@@ -92,7 +92,18 @@ async function askQuestion() {
   if (!question) return;
 
   $("ask-btn").disabled = true;
-  $("ask-btn").textContent = "Working…";
+  $("ask-progress").classList.remove("hidden");
+  const started = Date.now();
+  const progressEl = $("ask-progress");
+  const timer = setInterval(() => {
+    const secs = Math.floor((Date.now() - started) / 1000);
+    $("ask-btn").textContent = `Working… ${secs}s`;
+    progressEl.textContent =
+      secs < 30
+        ? "Generating SQL from your question (local Ollama on CPU — please wait)…"
+        : `Still working (${secs}s). First run loads the model into memory and can take 3–10+ minutes on CPU-only VMs.`;
+  }, 1000);
+  $("ask-btn").textContent = "Working… 0s";
 
   try {
     const result = await api("/api/ask", {
@@ -116,8 +127,13 @@ async function askQuestion() {
 
     renderTable($("ask-table"), result.columns || [], result.rows || []);
   } catch (err) {
-    alert(err.message);
+    alert(
+      `${err.message}\n\nIf this was a timeout, increase MODEL_TIMEOUT_SECONDS in .env ` +
+        "(default 600) or use a GPU inference VM. See docs/TROUBLESHOOTING.md."
+    );
   } finally {
+    clearInterval(timer);
+    $("ask-progress").classList.add("hidden");
     $("ask-btn").disabled = false;
     $("ask-btn").textContent = "Ask Prelytical";
   }

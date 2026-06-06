@@ -82,15 +82,47 @@ Update `MODEL_NAME` in `.env` if using a different model.
 
 This POC does **not** require Docker. Use native Python + local SQL Server + local Ollama.
 
-## Slow model responses on CPU-only VM
+## Slow model responses / Ask never returns (CPU-only VM)
 
-**Symptom:** Ask flow takes 30–120+ seconds.
+**Symptom:** Ask button shows "Working…" for many minutes, or eventually times out.
 
-**Fix:**
+**Why:** Same-VM CPU inference is slow. Each Ask call runs Ollama locally. The first request also **loads the model into RAM** (often 3–10+ minutes on a t3.xlarge). With full dbo access, large schema metadata makes SQL generation even slower.
 
-- Use a smaller model (e.g. `qwen2.5-coder:3b` if available)
-- Increase `MODEL_TIMEOUT_SECONDS` in `.env`
-- Expect slower summarization step after SQL executes
+**Fix (try in order):**
+
+1. **Warm the model before demo** (strongly recommended):
+
+```powershell
+.\install\warm_ollama_model.ps1
+```
+
+2. **Confirm Ollama works** (quick tags check + chat test):
+
+```powershell
+.\install\test_ollama_connection.ps1
+```
+
+3. **Use CPU-friendly `.env` defaults** (in `.env.example`):
+
+```env
+MODEL_TIMEOUT_SECONDS=600
+MODEL_SKIP_SUMMARIZATION=true
+MODEL_MAX_SCHEMA_OBJECTS=40
+```
+
+   Restart Prelytical after editing `.env`.
+
+4. **Smaller model** if still too slow:
+
+```powershell
+ollama pull qwen2.5-coder:3b
+```
+
+   Set `MODEL_NAME=qwen2.5-coder:3b` in `.env`.
+
+5. **Check the Audit Log tab** — if you see `model_sql_generated` but no `sql_executed`, SQL generation finished and the hang is elsewhere. If only `question_received`, Ollama is still generating SQL.
+
+6. **Production path:** GPU inference VM — see [GPU_INFERENCE_VM.md](GPU_INFERENCE_VM.md).
 
 ## Schema tab empty
 

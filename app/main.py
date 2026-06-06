@@ -64,6 +64,8 @@ def create_app() -> FastAPI:
             "model_base_url": settings.model_base_url,
             "model_name": settings.model_name,
             "max_rows": settings.sqlserver_max_rows,
+            "model_skip_summarization": settings.model_skip_summarization,
+            "model_timeout_seconds": settings.model_timeout_seconds,
         }
 
     @app.get("/api/schema")
@@ -89,6 +91,7 @@ def create_app() -> FastAPI:
                 question=question,
                 schema_metadata=schema_metadata,
                 max_rows=settings.sqlserver_max_rows,
+                max_schema_objects=settings.model_max_schema_objects,
             )
             generated_sql = model_client.generate_sql(system_prompt, user_prompt)
             audit.log_event(
@@ -256,10 +259,13 @@ def _finalize_ask_response(
         truncated=bool(query_result.get("truncated")),
     )
 
-    try:
-        answer = model_client.summarize_results(summary_system, summary_user)
+    if settings.model_skip_summarization:
+        answer = (
+            f"Query returned {query_result['row_count']} row(s). "
+            "Summarization is disabled (MODEL_SKIP_SUMMARIZATION=true) — see the table below."
+        )
         audit.log_event(
-            "model_summary_generated",
+            "model_summary_skipped",
             question=question,
             generated_sql=generated_sql,
             normalized_sql=validation.normalized_sql,
@@ -267,17 +273,29 @@ def _finalize_ask_response(
             row_count=query_result["row_count"],
             model_name=settings.model_name,
         )
-    except Exception as exc:
-        logger.exception("Summary generation failed")
-        audit.log_event(
-            "error",
-            question=question,
-            metadata={"stage": "summary", "error": str(exc)},
-        )
-        answer = (
-            "Query executed successfully, but summarization failed. "
-            f"Returned {query_result['row_count']} rows."
-        )
+    else:
+        try:
+            answer = model_client.summarize_results(summary_system, summary_user)
+            audit.log_event(
+                "model_summary_generated",
+                question=question,
+                generated_sql=generated_sql,
+                normalized_sql=validation.normalized_sql,
+                valid=True,
+                row_count=query_result["row_count"],
+                model_name=settings.model_name,
+            )
+        except Exception as exc:
+            logger.exception("Summary generation failed")
+            audit.log_event(
+                "error",
+                question=question,
+                metadata={"stage": "summary", "error": str(exc)},
+            )
+            answer = (
+                "Query executed successfully, but summarization failed. "
+                f"Returned {query_result['row_count']} rows — see the table below."
+            )
 
     base.update(
         {

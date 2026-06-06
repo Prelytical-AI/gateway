@@ -48,7 +48,12 @@
     <section class="panel active" id="panel-ask">
       <label for="question-input">Business question</label>
       <textarea id="question-input" rows="4" placeholder="Which region has the highest revenue?"></textarea>
+      <p id="ask-hint" class="hint ask-hint">
+        On a CPU-only VM, the first question can take several minutes while the model loads.
+        SQL and results still appear when ready — keep this tab open.
+      </p>
       <button id="ask-btn" class="btn primary">Ask Prelytical</button>
+      <p id="ask-progress" class="hint ask-progress hidden" aria-live="polite"></p>
       <div id="ask-result" class="result-block hidden">
         <h3>Generated SQL</h3>
         <pre id="ask-sql" class="code-block"></pre>

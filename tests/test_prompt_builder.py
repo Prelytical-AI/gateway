@@ -3,7 +3,17 @@ from app.services.prompt_builder import (
     build_blocked_answer,
     build_sql_generation_prompt,
     build_summarization_prompt,
+    compact_schema_metadata,
 )
+
+
+def test_compact_schema_metadata_truncates_large_catalogs():
+    objects = [{"name": f"t{i}", "type": "TABLE", "columns": []} for i in range(100)]
+    metadata = {"schemas": [{"schema": "dbo", "objects": objects}]}
+    compact = compact_schema_metadata(metadata, max_objects=10)
+    assert len(compact["schemas"][0]["objects"]) == 10
+    assert compact["schemas"][0]["truncated"] is True
+    assert "truncated" in compact["note"].lower()
 
 
 def test_sql_generation_prompt_includes_schema_and_question():

@@ -43,7 +43,9 @@ class Settings(BaseSettings):
     model_base_url: str = Field(default="http://localhost:11434/v1", alias="MODEL_BASE_URL")
     model_name: str = Field(default="qwen2.5-coder:7b", alias="MODEL_NAME")
     model_api_key: str = Field(default="ollama", alias="MODEL_API_KEY")
-    model_timeout_seconds: int = Field(default=120, alias="MODEL_TIMEOUT_SECONDS")
+    model_timeout_seconds: int = Field(default=600, alias="MODEL_TIMEOUT_SECONDS")
+    model_skip_summarization: bool = Field(default=True, alias="MODEL_SKIP_SUMMARIZATION")
+    model_max_schema_objects: int = Field(default=40, alias="MODEL_MAX_SCHEMA_OBJECTS")
 
     audit_db_path: str = Field(default="./prelytical_audit.sqlite3", alias="AUDIT_DB_PATH")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
