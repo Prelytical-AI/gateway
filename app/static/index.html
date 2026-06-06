@@ -4,13 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Prelytical Secure SQL Gateway</title>
+  <link rel="icon" type="image/png" href="/static/assets/prelytical-icon.png" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <header class="app-header">
-    <div>
-      <h1>Prelytical Secure SQL Gateway</h1>
-      <p class="subtitle">Executive briefs + read-only SQL analytics (on-prem)</p>
+    <div class="header-brand">
+      <img class="brand-logo" src="/static/assets/prelytical-logo.png" alt="Prelytical" />
+      <div>
+        <h1>Secure SQL Gateway</h1>
+        <p class="subtitle">Executive briefs + read-only SQL analytics (on-prem)</p>
+      </div>
     </div>
     <div class="header-actions">
       <button id="refresh-status-btn" class="btn secondary">Refresh Status</button>
@@ -125,9 +129,9 @@
       <ul class="checklist" id="setup-checklist">
         <li data-check="sql"><span class="box"></span> SQL Server reachable</li>
         <li data-check="login"><span class="box"></span> Read-only login configured</li>
-        <li data-check="schema"><span class="box"></span> ai schema/views created</li>
+        <li data-check="schema"><span class="box"></span> Allowed schema objects readable</li>
         <li data-check="ollama"><span class="box"></span> Ollama installed</li>
-        <li data-check="model"><span class="box"></span> qwen2.5-coder:7b pulled</li>
+        <li data-check="model"><span class="box"></span> Default model pulled</li>
         <li data-check="app"><span class="box"></span> Prelytical running on localhost:8080</li>
         <li data-check="brief"><span class="box"></span> Executive brief generated</li>
         <li data-check="guardrails"><span class="box"></span> Unsafe SQL blocked</li>

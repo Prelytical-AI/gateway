@@ -30,9 +30,22 @@ body {
   box-shadow: var(--shadow);
 }
 
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brand-logo {
+  height: 40px;
+  width: auto;
+  display: block;
+}
+
 .app-header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
+  font-weight: 600;
 }
 
 .subtitle {

@@ -64,6 +64,8 @@ async function loadConfigAndHealth() {
     markChecklist("sql", health.sql_configured);
     markChecklist("ollama", health.model_configured);
     markChecklist("model", health.model_configured);
+
+    await refreshSetupChecklist(health);
   } catch (err) {
     setStatus("status-sql", "Error", false);
     setStatus("status-model", "Error", false);
@@ -71,9 +73,49 @@ async function loadConfigAndHealth() {
   }
 }
 
+async function refreshSetupChecklist(health) {
+  let healthData = health;
+  if (!healthData) {
+    try {
+      healthData = await api("/health");
+    } catch {
+      return;
+    }
+  }
+
+  markChecklist("login", healthData.sql_configured);
+
+  try {
+    const schema = await api("/api/schema");
+    const hasObjects = (schema.schemas || []).some((s) => (s.objects || []).length > 0);
+    markChecklist("schema", hasObjects);
+  } catch {
+    markChecklist("schema", false);
+  }
+
+  try {
+    const guard = await api("/api/sql/validate", {
+      method: "POST",
+      body: JSON.stringify({ sql: "DELETE FROM dbo.Orders" }),
+    });
+    markChecklist("guardrails", !guard.valid);
+  } catch {
+    markChecklist("guardrails", false);
+  }
+
+  try {
+    const audit = await api("/api/audit/recent");
+    const hasBrief = (audit.events || []).some((e) => e.event_type === "brief_generated");
+    markChecklist("brief", hasBrief);
+  } catch {
+    /* optional */
+  }
+}
+
 function markChecklist(key, done) {
   const item = document.querySelector(`#setup-checklist li[data-check="${key}"]`);
-  if (item && done) item.classList.add("done");
+  if (!item) return;
+  item.classList.toggle("done", !!done);
 }
 
 function initTabs() {
@@ -234,8 +276,7 @@ async function loadSchema() {
       });
     });
 
-    markChecklist("schema", (data.schemas || []).length > 0);
-    markChecklist("login", true);
+    markChecklist("schema", (data.schemas || []).some((s) => (s.objects || []).length > 0));
   } catch (err) {
     $("schema-content").innerHTML = `<p class="validation bad">${err.message}</p>`;
   }
