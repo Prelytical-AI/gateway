@@ -216,6 +216,7 @@ async function loadAudit() {
         ${event.question ? `<div><strong>Q:</strong> ${event.question}</div>` : ""}
         ${event.generated_sql ? `<div><strong>SQL:</strong> <code>${event.generated_sql}</code></div>` : ""}
         ${event.blocked_reason ? `<div class="validation bad">${event.blocked_reason}</div>` : ""}
+        ${event.metadata?.error ? `<div class="validation bad">${event.metadata.error}</div>` : ""}
         ${event.row_count != null ? `<div>Rows: ${event.row_count}</div>` : ""}
       `;
       container.appendChild(block);
