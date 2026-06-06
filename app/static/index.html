@@ -10,7 +10,7 @@
   <header class="app-header">
     <div>
       <h1>Prelytical Secure SQL Gateway</h1>
-      <p class="subtitle">Same-VM SQL Server + Ollama POC</p>
+      <p class="subtitle">Executive briefs + read-only SQL analytics (on-prem)</p>
     </div>
     <div class="header-actions">
       <button id="refresh-status-btn" class="btn secondary">Refresh Status</button>
@@ -38,19 +38,50 @@
     </section>
 
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="ask">Ask a Question</button>
+      <button class="tab active" data-tab="brief">Executive Brief</button>
+      <button class="tab" data-tab="ask">Ask a Question</button>
       <button class="tab" data-tab="schema">Schema</button>
       <button class="tab" data-tab="validator">SQL Validator</button>
       <button class="tab" data-tab="audit">Audit Log</button>
       <button class="tab" data-tab="setup">Setup Checklist</button>
     </nav>
 
-    <section class="panel active" id="panel-ask">
+    <section class="panel active" id="panel-brief">
+      <label for="brief-title">Brief title</label>
+      <input id="brief-title" type="text" value="Executive Data Readiness Brief" />
+      <label for="brief-objective">Objective</label>
+      <textarea id="brief-objective" rows="3">Assess what this database is well positioned to answer for executives — data shape, readiness, top opportunities, and validation steps.</textarea>
+      <label for="brief-context">Business context (optional)</label>
+      <textarea id="brief-context" rows="3" placeholder="Industry, goals, key metrics, privacy constraints…"></textarea>
+      <label for="brief-audience">Audience</label>
+      <input id="brief-audience" type="text" value="Executives and analytics leaders" />
+      <p class="hint ask-hint">
+        This is the core Prelytical workflow: schema-first executive brief with HTML report.
+        Uses connected SQL metadata only (no row-level data). On CPU, generation can take 10–20+ minutes — keep this tab open.
+      </p>
+      <button id="brief-btn" class="btn primary">Generate Executive Brief</button>
+      <p id="brief-progress" class="hint ask-progress hidden" aria-live="polite"></p>
+      <div id="brief-result" class="result-block hidden">
+        <div class="brief-score-row">
+          <div class="brief-score-card"><span>Readiness</span><strong id="brief-readiness">—</strong></div>
+          <div class="brief-score-card"><span>Confidence</span><strong id="brief-confidence">—</strong></div>
+        </div>
+        <h3>Executive summary</h3>
+        <p id="brief-summary"></p>
+        <div class="button-row">
+          <button id="brief-download-btn" class="btn secondary" type="button">Download HTML</button>
+        </div>
+        <h3>Report preview</h3>
+        <iframe id="brief-frame" class="brief-frame" title="Executive brief HTML report" sandbox=""></iframe>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-ask">
       <label for="question-input">Business question</label>
       <textarea id="question-input" rows="4" placeholder="Which region has the highest revenue?"></textarea>
       <p id="ask-hint" class="hint ask-hint">
-        On a CPU-only VM, the first question can take several minutes while the model loads.
-        SQL and results still appear when ready — keep this tab open.
+        Follow-on capability: run a read-only SQL query from a specific question.
+        On a CPU-only VM this can take several minutes — use Executive Brief for shape/readiness first.
       </p>
       <button id="ask-btn" class="btn primary">Ask Prelytical</button>
       <p id="ask-progress" class="hint ask-progress hidden" aria-live="polite"></p>
@@ -97,6 +128,7 @@
         <li data-check="ollama"><span class="box"></span> Ollama installed</li>
         <li data-check="model"><span class="box"></span> qwen2.5-coder:7b pulled</li>
         <li data-check="app"><span class="box"></span> Prelytical running on localhost:8080</li>
+        <li data-check="brief"><span class="box"></span> Executive brief generated</li>
         <li data-check="guardrails"><span class="box"></span> Unsafe SQL blocked</li>
       </ul>
       <p class="hint">Use the install scripts in <code>install/</code> and SQL scripts in <code>sql/</code> to complete setup.</p>

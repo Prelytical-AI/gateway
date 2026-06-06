@@ -1,12 +1,13 @@
 # Prelytical Secure SQL Gateway
 
-A same-VM install for running AI against SQL Server data on a **trusted Windows VM**:
+On-premises Prelytical for sensitive SQL Server environments:
 
-- SQL Server **read-only** login (no INSERT/UPDATE/DELETE)
-- App-level **SELECT-only** guardrails (blocks DDL/DML even if misconfigured)
-- **Ollama** on the same VM as the local model runtime (`localhost:11434` — not cloud AI)
-- Local audit logging
-- Browser UI at `http://localhost:8080`
+- **Executive briefs** — schema-first readiness, data shape, ranked opportunities, standalone HTML report
+- **Read-only SQL analytics** — natural language → SELECT → results (follow-on deep dives)
+- **Ollama** on the same VM or a private GPU inference box (not cloud AI)
+- Local audit logging · Browser UI at `http://localhost:8080`
+
+The cloud product lives in [`../platform/`](../platform/). This gateway delivers the same **brief generation contract** using live SQL Server schema metadata as source context.
 
 This is a **standalone repository** for on-premises installs. It also appears as the `gateway/` submodule inside the [Prelytical workspace](https://github.com/Prelytical-AI/prelytical).
 
@@ -144,6 +145,7 @@ gateway/
 | GET | `/health` | App, SQL, and model status |
 | GET | `/api/config/safe` | Non-sensitive configuration |
 | GET | `/api/schema` | Allowed schema metadata |
+| POST | `/api/brief/generate` | Executive brief + HTML report from schema metadata |
 | POST | `/api/ask` | Natural language → SQL → results → summary |
 | POST | `/api/sql/validate` | Validate SQL without executing |
 | POST | `/api/sql/execute` | Validate and execute read-only SQL |

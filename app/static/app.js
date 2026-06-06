@@ -87,6 +87,65 @@ function initTabs() {
   });
 }
 
+let lastBriefHtml = "";
+
+async function generateBrief() {
+  const payload = {
+    title: $("brief-title").value.trim(),
+    objective: $("brief-objective").value.trim(),
+    business_context: $("brief-context").value.trim() || null,
+    audience: $("brief-audience").value.trim(),
+  };
+  if (!payload.objective) return;
+
+  $("brief-btn").disabled = true;
+  $("brief-progress").classList.remove("hidden");
+  const started = Date.now();
+  const progressEl = $("brief-progress");
+  const timer = setInterval(() => {
+    const secs = Math.floor((Date.now() - started) / 1000);
+    $("brief-btn").textContent = `Generating… ${secs}s`;
+    progressEl.textContent =
+      secs < 60
+        ? "Building executive brief from schema metadata (local Ollama)…"
+        : `Still generating (${secs}s). Large HTML briefs on CPU can take 10–20+ minutes.`;
+  }, 1000);
+  $("brief-btn").textContent = "Generating… 0s";
+
+  try {
+    const result = await api("/api/brief/generate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    $("brief-result").classList.remove("hidden");
+    $("brief-readiness").textContent = result.readiness_score ?? "—";
+    $("brief-confidence").textContent = result.confidence_score ?? "—";
+    $("brief-summary").textContent = result.executive_summary || "";
+    lastBriefHtml = result.html_report || "";
+    $("brief-frame").srcdoc = lastBriefHtml || "<p>No HTML report returned.</p>";
+    markChecklist("brief", true);
+  } catch (err) {
+    alert(`${err.message}\n\nTry warm_ollama_model.ps1 first and increase BRIEF_TIMEOUT_SECONDS in .env.`);
+  } finally {
+    clearInterval(timer);
+    $("brief-progress").classList.add("hidden");
+    $("brief-btn").disabled = false;
+    $("brief-btn").textContent = "Generate Executive Brief";
+  }
+}
+
+function downloadBriefHtml() {
+  if (!lastBriefHtml) return;
+  const blob = new Blob([lastBriefHtml], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "prelytical-executive-brief.html";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function askQuestion() {
   const question = $("question-input").value.trim();
   if (!question) return;
@@ -231,6 +290,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadConfigAndHealth();
 
   $("refresh-status-btn").addEventListener("click", loadConfigAndHealth);
+  $("brief-btn").addEventListener("click", generateBrief);
+  $("brief-download-btn").addEventListener("click", downloadBriefHtml);
   $("ask-btn").addEventListener("click", askQuestion);
   $("load-schema-btn").addEventListener("click", loadSchema);
   $("validate-btn").addEventListener("click", () => validateSql(false));

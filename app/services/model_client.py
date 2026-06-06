@@ -82,12 +82,21 @@ class ModelClient:
     ) -> str:
         return self.chat(system=system, user=user, temperature=0.2)
 
+    def generate_brief(self, system: str, user: str) -> str:
+        return self.chat(
+            system=system,
+            user=user,
+            temperature=0.2,
+            timeout_seconds=self.config.brief_timeout_seconds,
+        )
+
     def chat(
         self,
         *,
         system: str,
         user: str,
         temperature: float = 0.1,
+        timeout_seconds: Optional[int] = None,
     ) -> str:
         url = f"{self.base_url}/chat/completions"
         payload = {
@@ -104,7 +113,8 @@ class ModelClient:
         }
 
         try:
-            response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
+            timeout = timeout_seconds if timeout_seconds is not None else self.timeout
+            response = requests.post(url, json=payload, headers=headers, timeout=timeout)
         except requests.exceptions.ConnectionError as exc:
             raise RuntimeError(
                 "Cannot connect to Ollama. Ensure Ollama is running on this VM "
@@ -112,7 +122,7 @@ class ModelClient:
             ) from exc
         except requests.exceptions.Timeout as exc:
             raise RuntimeError(
-                f"Model request timed out after {self.timeout} seconds."
+                f"Model request timed out after {timeout} seconds."
             ) from exc
 
         if response.status_code >= 400:

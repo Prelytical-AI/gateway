@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.services.audit import AuditService
 from app.services.guardrails import ValidationResult, validate_sql
 from app.services.model_client import ModelClient
+from app.services.brief_builder import build_brief_prompt, parse_brief_json
 from app.services.prompt_builder import (
     build_blocked_answer,
     build_sql_generation_prompt,
@@ -35,6 +36,19 @@ class AskRequest(BaseModel):
 
 class SqlRequest(BaseModel):
     sql: str = Field(min_length=1, max_length=20000)
+
+
+class BriefRequest(BaseModel):
+    title: str = Field(default="Executive Data Readiness Brief", max_length=200)
+    objective: str = Field(
+        default=(
+            "Assess what this database is well positioned to answer for executives, "
+            "including data shape, readiness, opportunities, and validation steps."
+        ),
+        max_length=4000,
+    )
+    business_context: Optional[str] = Field(default=None, max_length=8000)
+    audience: str = Field(default="Executives and analytics leaders", max_length=500)
 
 
 def create_app() -> FastAPI:
@@ -107,6 +121,55 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.exception("Ask flow failed")
             audit.log_event("error", question=question, metadata={"error": str(exc)})
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/api/brief/generate")
+    def generate_brief(request: BriefRequest) -> Dict[str, Any]:
+        audit.log_event(
+            "brief_requested",
+            question=request.objective,
+            metadata={
+                "title": request.title,
+                "audience": request.audience,
+            },
+        )
+
+        try:
+            schema_metadata = sql_service.get_allowed_schema_metadata()
+            system_prompt, user_prompt = build_brief_prompt(
+                title=request.title.strip(),
+                objective=request.objective.strip(),
+                business_context=request.business_context,
+                audience=request.audience.strip(),
+                schema_metadata=schema_metadata,
+                database_name=settings.sqlserver_database,
+            )
+            raw = model_client.generate_brief(system_prompt, user_prompt)
+            output = parse_brief_json(raw)
+            audit.log_event(
+                "brief_generated",
+                question=request.objective,
+                metadata={
+                    "title": request.title,
+                    "readiness_score": output.get("readiness_score"),
+                    "confidence_score": output.get("confidence_score"),
+                },
+            )
+            return {
+                "title": request.title,
+                "output": output,
+                "executive_summary": output.get("executive_summary", ""),
+                "readiness_score": output.get("readiness_score"),
+                "confidence_score": output.get("confidence_score"),
+                "html_report": output.get("html_report", ""),
+            }
+        except Exception as exc:
+            logger.exception("Brief generation failed")
+            audit.log_event(
+                "error",
+                question=request.objective,
+                metadata={"stage": "brief", "error": str(exc)},
+            )
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.post("/api/sql/validate")
