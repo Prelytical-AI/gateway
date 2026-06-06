@@ -8,22 +8,42 @@ After `./infra/deploy-test-vm.sh` completes:
 
 | Item | Value |
 |------|-------|
-| RDP host | Stack output `PublicIp` |
+| RDP host | Stack output `PublicIp` (`52.90.192.205` for current test stack) |
 | RDP user | `Administrator` |
-| RDP password | Decrypt with EC2 key pair (see below) |
+| RDP password | See **Option A** or **Option B** below |
 | SQL host | `localhost` |
 | SQL database | `PrelyticalDemoDW` |
 | SQL login | `prelytical_readonly` |
 | SQL password | `PrelyticalTest!2026` (or your `READONLY_PASSWORD`) |
 
-Decrypt Windows password:
+### Option A — Known admin password (no `.pem` file needed)
+
+If you do not have the EC2 private key locally, reset the Administrator password via SSM:
+
+```bash
+aws ssm send-command \
+  --region us-east-1 \
+  --instance-ids i-084acc964f3517aad \
+  --document-name AWS-RunPowerShellScript \
+  --parameters 'commands=["net user Administrator '\''YourPasswordHere'\''","net user Administrator /active:yes"]'
+```
+
+For the current test VM, a temporary password was set: **`PrelyticalAdmin!2026`**
+
+### Option B — Decrypt the launch password (requires `.pem`)
+
+`get-password-data` only works if you have the **private key file** used when the key pair was created. It is not stored in AWS.
 
 ```bash
 aws ec2 get-password-data \
-  --instance-id i-xxxxxxxx \
-  --priv-launch-key ~/.ssh/Dev-Mac.pem \
+  --instance-id i-084acc964f3517aad \
+  --priv-launch-key /full/path/to/Dev-Mac.pem \
   --region us-east-1
 ```
+
+The instance was launched with key pair **`Dev-Mac`**. If `~/.ssh/Dev-Mac.pem` does not exist, use Option A or locate the key from the machine where `Dev-Mac` was originally created (often AWS Console → download at key creation time).
+
+**Common error:** `priv-launch-key should be a path to the local SSH private key file` — the file path is wrong or missing.
 
 On the VM, bootstrap notes are at `C:\PrelyticalBootstrap\README.txt`.
 
