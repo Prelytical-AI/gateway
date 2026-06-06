@@ -20,7 +20,7 @@ function Read-Default {
 }
 
 $sqlHost = Read-Default "SQL Server host" "localhost"
-$sqlInstance = Read-Host "SQL Server instance (blank for default)"
+$sqlInstance = Read-Host "SQL Server instance (press Enter for default instance - NOT the database name)"
 $sqlDatabase = Read-Default "SQL Server database" "PrelyticalDemoDW"
 $sqlUser = Read-Default "SQL username" "prelytical_readonly"
 $sqlPassword = Read-Host "SQL password" -AsSecureString
@@ -28,7 +28,29 @@ $sqlPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
     [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sqlPassword)
 )
 $odbcDriver = Read-Default "ODBC driver" "ODBC Driver 18 for SQL Server"
-$modelBaseUrl = Read-Default "Model base URL" "http://localhost:11434/v1"
+
+Write-Host ""
+Write-Host "Where does Ollama run?" -ForegroundColor Cyan
+Write-Host "  1) This SQL/gateway VM (localhost - same-VM / Option 1)"
+Write-Host "  2) Separate GPU VM on the private network (Option 2)"
+Write-Host ""
+$ollamaChoice = Read-Host "Choice [1]"
+if ($ollamaChoice -eq "2") {
+    $gpuIp = Read-Host "GPU VM private IP (e.g. 10.0.2.47)"
+    $gpuIp = $gpuIp.Trim()
+    if ([string]::IsNullOrWhiteSpace($gpuIp)) {
+        Write-Host "No IP entered; falling back to localhost." -ForegroundColor Yellow
+        $modelBaseUrl = "http://localhost:11434/v1"
+    } else {
+        $modelBaseUrl = "http://${gpuIp}:11434/v1"
+        Write-Host ""
+        Write-Host "Remote Ollama: $modelBaseUrl" -ForegroundColor Green
+        Write-Host "On this SQL VM, skip install_ollama_windows.ps1 and pull_default_models.ps1." -ForegroundColor DarkGray
+        Write-Host "Bootstrap the GPU VM with install/bootstrap-inference-linux.sh (see docs/GPU_INFERENCE_VM.md)." -ForegroundColor DarkGray
+    }
+} else {
+    $modelBaseUrl = Read-Default "Model base URL" "http://localhost:11434/v1"
+}
 $modelName = Read-Default "Model name" "qwen2.5-coder:7b"
 $appPort = Read-Default "App port" "8080"
 

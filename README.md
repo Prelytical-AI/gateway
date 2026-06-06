@@ -87,6 +87,17 @@ Use your real database name and the same password as in `01_create_readonly_logi
 
 Open **http://localhost:8080** — status cards should show SQL and Model connected.
 
+## Production: GPU inference VM (Option 2)
+
+For faster responses, run Ollama on a **separate Linux GPU VM** on the same private network. The gateway stays on the SQL Server VM; only `MODEL_BASE_URL` changes.
+
+1. Client IT provisions a Linux GPU VM (see [GPU inference VM guide](docs/GPU_INFERENCE_VM.md))
+2. On the GPU VM: `sudo ./install/bootstrap-inference-linux.sh --allowed-ip <sql-vm-private-ip>`
+3. On the SQL VM: skip `install_ollama_windows.ps1`, run `configure_env_wizard.ps1` → Option 2
+4. Verify: `.\install\test_ollama_connection.ps1`
+
+See [Architecture options](docs/ARCHITECTURE_OPTIONS.html) for a comparison of all deployment paths.
+
 ### Test questions
 
 ```text
@@ -149,6 +160,8 @@ python -m venv .venv
 
 ## Documentation
 
+- [GPU inference VM](docs/GPU_INFERENCE_VM.md) — Option 2: separate Linux GPU box + bootstrap script
+- [Architecture options](docs/ARCHITECTURE_OPTIONS.html) — same-VM vs split-VM vs cloud inference
 - [AWS test VM](docs/TEST_VM.md) — provision a Windows SQL Server EC2 for fresh install testing
 - [Same-VM POC guide](docs/SAME_VM_SQLSERVER_OLLAMA_POC.md) — full walkthrough
 - [Client demo script](docs/CLIENT_TEST_SCRIPT.md)

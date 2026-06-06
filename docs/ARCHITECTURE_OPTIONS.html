@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prelytical Secure SQL Gateway — Architecture Options</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --text: #0f2744;
+      --muted: #5b6b7f;
+      --border: #d8e0ea;
+      --primary: #0d9488;
+      --primary-light: #ccfbf1;
+      --primary-dark: #0b7a70;
+      --navy: #0f2744;
+      --navy-mid: #16365c;
+      --danger: #b42318;
+      --danger-bg: #fef3f2;
+      --success: #067647;
+      --success-bg: #ecfdf3;
+      --warning: #b54708;
+      --warning-bg: #fffaeb;
+      --shadow: 0 8px 24px rgba(15, 39, 68, 0.08);
+      --shadow-lg: 0 16px 48px rgba(15, 39, 68, 0.12);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* Header */
+    .hero {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 55%, #1a4a6e 100%);
+      color: #fff;
+      padding: 3.5rem 2rem 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 85% 20%, rgba(13, 148, 136, 0.25) 0%, transparent 45%),
+        radial-gradient(circle at 10% 80%, rgba(255, 255, 255, 0.06) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(13, 148, 136, 0.25);
+      border: 1px solid rgba(13, 148, 136, 0.5);
+      color: #99f6e4;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    .hero h1 {
+      margin: 0 0 0.75rem;
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 680px;
+      font-size: 1.1rem;
+      color: #c7d6ea;
+    }
+
+    /* Layout */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 2rem 4rem;
+    }
+
+    section {
+      margin-top: 3rem;
+    }
+
+    section > h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin: 0 0 0.5rem;
+      letter-spacing: -0.01em;
+    }
+
+    section > .section-lead {
+      color: var(--muted);
+      margin: 0 0 1.75rem;
+      max-width: 720px;
+    }
+
+    /* Intro card */
+    .intro-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem 2rem;
+      margin-top: -2.5rem;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      z-index: 1;
+    }
+
+    .intro-card p { margin: 0 0 1rem; color: var(--muted); }
+    .intro-card p:last-child { margin-bottom: 0; }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .intro-stat {
+      text-align: center;
+      padding: 0.75rem;
+    }
+
+    .intro-stat strong {
+      display: block;
+      font-size: 1.5rem;
+      color: var(--primary);
+      line-height: 1.2;
+    }
+
+    .intro-stat span {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    /* Option cards — stacked full width */
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 2.5rem;
+    }
+
+    .option-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .option-body {
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--border);
+    }
+
+    .option-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .option-card.recommended {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary), var(--shadow-lg);
+    }
+
+    .option-header {
+      padding: 1.75rem 2rem 1.25rem;
+    }
+
+    .option-number {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .option-header h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1.45rem;
+      font-weight: 700;
+    }
+
+    .option-tagline {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .rec-badge {
+      display: inline-block;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      margin-top: 0.75rem;
+    }
+
+    .warn-badge {
+      display: inline-block;
+      background: var(--warning-bg);
+      color: var(--warning);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      margin-top: 0.75rem;
+    }
+
+    /* Architecture diagrams */
+    .diagram {
+      padding: 2rem 2.5rem;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+      font-family: "Cascadia Code", "SF Mono", Consolas, monospace;
+      font-size: 0.88rem;
+      line-height: 1.65;
+      overflow-x: auto;
+      white-space: pre;
+      color: #334155;
+      text-align: center;
+    }
+
+    .diagram .box {
+      display: inline-block;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.15rem 0.4rem;
+    }
+
+    .diagram .highlight { color: var(--primary-dark); font-weight: 600; }
+    .diagram .dim { color: #94a3b8; }
+
+    /* Pros / cons */
+    .pros-cons {
+      padding: 2rem 2.5rem;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-content: start;
+    }
+
+    .pc-block h4 {
+      margin: 0 0 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .pc-block.pros h4 { color: var(--success); }
+    .pc-block.cons h4 { color: var(--danger); }
+
+    .pc-block ul {
+      margin: 0;
+      padding-left: 1.25rem;
+      font-size: 0.95rem;
+      line-height: 1.65;
+      color: var(--muted);
+    }
+
+    .pc-block li { margin-bottom: 0.5rem; }
+    .pc-block li:last-child { margin-bottom: 0; }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      padding: 1.25rem 2rem 1.75rem;
+      border-top: 1px solid var(--border);
+      background: #fafbfc;
+    }
+
+    .meta-pill {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.3rem 0.65rem;
+      border-radius: 999px;
+      background: #eef2f7;
+      color: var(--muted);
+    }
+
+    .meta-pill.good { background: var(--success-bg); color: var(--success); }
+    .meta-pill.mid { background: var(--warning-bg); color: var(--warning); }
+    .meta-pill.bad { background: var(--danger-bg); color: var(--danger); }
+
+    /* Comparison table */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    thead {
+      background: linear-gradient(135deg, var(--navy), var(--navy-mid));
+      color: #fff;
+    }
+
+    th, td {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th { font-weight: 600; font-size: 0.82rem; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+
+    td:first-child { font-weight: 600; color: var(--text); }
+    td:not(:first-child) { color: var(--muted); text-align: center; }
+
+    .cell-yes { color: var(--success) !important; font-weight: 600; }
+    .cell-no { color: var(--danger) !important; }
+    .cell-mid { color: var(--warning) !important; }
+
+    /* Decision guide */
+    .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .decision-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    .decision-card h3 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .decision-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .decision-icon.a { background: var(--primary-light); }
+    .decision-icon.b { background: var(--success-bg); }
+    .decision-icon.c { background: var(--danger-bg); }
+
+    .decision-card p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .decision-card strong { color: var(--text); }
+
+    /* Flow section */
+    .flow-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      box-shadow: var(--shadow);
+    }
+
+    .flow-steps {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem 0.25rem;
+    }
+
+    .flow-step {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.65rem 1rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-align: center;
+      min-width: 110px;
+    }
+
+    .flow-step.accent {
+      background: var(--primary-light);
+      border-color: rgba(13, 148, 136, 0.35);
+      color: var(--primary-dark);
+    }
+
+    .flow-arrow {
+      color: #94a3b8;
+      font-size: 1.1rem;
+      padding: 0 0.15rem;
+    }
+
+    .flow-caption {
+      text-align: center;
+      margin: 1.25rem 0 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: 0.82rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    footer a { color: var(--primary); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 768px) {
+      .pros-cons {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+        padding: 1.5rem 1.25rem;
+      }
+      .diagram {
+        padding: 1.5rem 1.25rem;
+        font-size: 0.75rem;
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .hero { padding: 2.5rem 1.25rem 3rem; }
+      .container { padding: 0 1.25rem 3rem; }
+      .intro-card { margin-top: -1.5rem; padding: 1.25rem; }
+      th, td { padding: 0.65rem 0.75rem; font-size: 0.8rem; }
+      .flow-arrow { display: none; }
+      .flow-steps { flex-direction: column; }
+      .option-header,
+      .diagram,
+      .pros-cons,
+      .meta-row { padding-left: 1.25rem; padding-right: 1.25rem; }
+    }
+
+    @media print {
+      .hero { padding: 1.5rem; }
+      .option-card { break-inside: avoid; box-shadow: none; }
+      .option-card:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="hero">
+    <div class="hero-inner">
+      <span class="badge">Deployment Guide</span>
+      <h1>Prelytical Secure SQL Gateway<br />Architecture Options</h1>
+      <p>Three ways to deploy AI-assisted, read-only SQL analytics in sensitive environments — with trade-offs for speed, simplicity, and data residency.</p>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <div class="intro-card">
+      <p>
+        Every option keeps the same <strong>application security model</strong>: read-only SQL login,
+        SELECT-only guardrails, curated schema access, local audit logging, and a browser UI bound to
+        <code>localhost:8080</code> on the gateway VM. What changes is <em>where the LLM runs</em> and
+        how much infrastructure the client operates.
+      </p>
+      <div class="intro-grid">
+        <div class="intro-stat"><strong>1 VM</strong><span>Simplest install</span></div>
+        <div class="intro-stat"><strong>2 VMs</strong><span>Production performance</span></div>
+        <div class="intro-stat"><strong>0 local GPU</strong><span>Cloud inference option</span></div>
+        <div class="intro-stat"><strong>100%</strong><span>On-prem data path (Options 1 &amp; 2)</span></div>
+      </div>
+    </div>
+
+    <!-- Options -->
+    <section id="options">
+      <h2>Three deployment options</h2>
+      <p class="section-lead">Choose based on POC vs production, available GPU hardware, and how strictly data must stay inside the client boundary.</p>
+
+      <div class="options-grid">
+
+        <!-- Option 1 -->
+        <article class="option-card" id="option-1">
+          <div class="option-header">
+            <div class="option-number">Option 1</div>
+            <h3>Same-VM (All-in-One)</h3>
+            <p class="option-tagline">SQL Server, gateway, and Ollama on one Windows VM</p>
+          </div>
+          <div class="option-body">
+          <div class="diagram">┌─────────────────────────────────────┐
+│         <span class="highlight">Single Windows VM</span>               │
+│                                     │
+│  ┌──────────┐  ┌──────────┐        │
+│  │ SQL      │  │ Gateway  │        │
+│  │ Server   │◄─┤ :8080    │        │
+│  └──────────┘  └────┬─────┘        │
+│                     │ localhost     │
+│              ┌──────▼──────┐        │
+│              │ Ollama CPU  │        │
+│              │ :11434      │        │
+│              └─────────────┘        │
+└─────────────────────────────────────┘
+<span class="dim">Best for: POC, demos, small datasets</span></div>
+          <div class="pros-cons">
+            <div class="pc-block pros">
+              <h4>Pros</h4>
+              <ul>
+                <li>Simplest install — one VM, one runbook, no networking between boxes</li>
+                <li>Lowest client IT overhead; matches existing SQL Server VM patterns</li>
+                <li>All data stays on one machine; no cross-VM traffic to secure</li>
+                <li>Works offline after initial model download</li>
+                <li>Ideal for proof-of-concept and client demos</li>
+              </ul>
+            </div>
+            <div class="pc-block cons">
+              <h4>Cons</h4>
+              <ul>
+                <li>CPU-only inference is slow (often 2–5+ minutes per question)</li>
+                <li>Ollama competes with SQL Server for RAM and CPU</li>
+                <li>Two LLM calls per question (SQL generation + summary) doubles latency</li>
+                <li>Not suitable for interactive production use at scale</li>
+                <li>Large models may not fit comfortably alongside SQL workloads</li>
+              </ul>
+            </div>
+          </div>
+          </div>
+          <div class="meta-row">
+            <span class="meta-pill good">Easiest setup</span>
+            <span class="meta-pill mid">Slow responses</span>
+            <span class="meta-pill good">Full data residency</span>
+          </div>
+        </article>
+
+        <!-- Option 2 -->
+        <article class="option-card recommended" id="option-2">
+          <div class="option-header">
+            <div class="option-number">Option 2</div>
+            <h3>Split-VM (SQL + GPU Inference)</h3>
+            <p class="option-tagline">Gateway on SQL VM; Ollama on a dedicated GPU box in the same VPC/LAN</p>
+            <span class="rec-badge">Recommended for production</span>
+          </div>
+          <div class="option-body">
+          <div class="diagram">┌──────────────────────┐   private    ┌──────────────────────┐
+│  <span class="highlight">VM 1: SQL + Gateway</span>  │ ── :11434 ─► │  <span class="highlight">VM 2: GPU Inference</span>  │
+│                      │   HTTP only  │                      │
+│  SQL Server          │              │  Linux + NVIDIA      │
+│  Gateway :8080       │ ◄─────────── │  Ollama :11434       │
+│  MODEL_BASE_URL ─────┼── 10.x.x.x   │  (no SQL, no UI)     │
+└──────────────────────┘              └──────────────────────┘
+        <span class="dim">Same VPC / on-prem network — no public internet</span></div>
+          <div class="pros-cons">
+            <div class="pc-block pros">
+              <h4>Pros</h4>
+              <ul>
+                <li>Fast inference — responses in seconds instead of minutes</li>
+                <li>SQL Server and LLM workloads are isolated; no resource contention</li>
+                <li>Data never leaves the client environment (private IP only)</li>
+                <li>Gateway change is minimal: one <code>MODEL_BASE_URL</code> in <code>.env</code></li>
+                <li>GPU VM can be sized independently; scale or upgrade without touching SQL</li>
+                <li>Security groups restrict port 11434 to the SQL VM only</li>
+              </ul>
+            </div>
+            <div class="pc-block cons">
+              <h4>Cons</h4>
+              <ul>
+                <li>Two VMs to provision, patch, and monitor</li>
+                <li>Requires GPU quota / hardware (e.g. AWS <code>g4dn.xlarge</code>)</li>
+                <li>Client IT must configure VPC networking and security groups</li>
+                <li>Questions, schema metadata, and query results traverse the private network to the GPU VM</li>
+                <li>Slightly more complex bootstrap (two install scripts)</li>
+              </ul>
+            </div>
+          </div>
+          </div>
+          <div class="meta-row">
+            <span class="meta-pill good">Fast inference</span>
+            <span class="meta-pill mid">Two VMs</span>
+            <span class="meta-pill good">Client-owned boundary</span>
+          </div>
+        </article>
+
+        <!-- Option 3 -->
+        <article class="option-card" id="option-3">
+          <div class="option-header">
+            <div class="option-number">Option 3</div>
+            <h3>Cloud-Hosted Inference</h3>
+            <p class="option-tagline">Gateway on client VM; LLM calls a hosted API (Prelytical cloud or third party)</p>
+            <span class="warn-badge">Not recommended for sensitive data</span>
+          </div>
+          <div class="option-body">
+          <div class="diagram">┌──────────────────────┐                 ┌──────────────────────┐
+│  <span class="highlight">Client VM</span>            │    HTTPS       │  <span class="dim">External Cloud</span>       │
+│                      │ ─────────────► │                      │
+│  SQL Server          │  questions,    │  Hosted LLM API      │
+│  Gateway :8080       │  schema, rows  │  (Prelytical / etc.) │
+└──────────────────────┘                 └──────────────────────┘
+        <span class="dim">Data crosses client network boundary</span></div>
+          <div class="pros-cons">
+            <div class="pc-block pros">
+              <h4>Pros</h4>
+              <ul>
+                <li>No GPU hardware or local model management</li>
+                <li>Fastest time-to-value if cloud API is already approved</li>
+                <li>Always on latest models without client-side upgrades</li>
+                <li>Elastic capacity — no sizing a GPU VM</li>
+                <li>Single VM on client side (SQL + gateway only)</li>
+              </ul>
+            </div>
+            <div class="pc-block cons">
+              <h4>Cons</h4>
+              <ul>
+                <li>Question text, schema metadata, and query result rows leave the client network</li>
+                <li>Conflicts with typical healthcare, finance, and government data policies</li>
+                <li>Requires outbound internet and third-party DPAs / BAAs</li>
+                <li>Not aligned with Prelytical Gateway’s on-prem security story</li>
+                <li>Latency and availability depend on external service SLA</li>
+                <li>Audit trail must account for off-box data processing</li>
+              </ul>
+            </div>
+          </div>
+          </div>
+          <div class="meta-row">
+            <span class="meta-pill good">No GPU needed</span>
+            <span class="meta-pill bad">Data leaves client</span>
+            <span class="meta-pill bad">Policy risk</span>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- Data flow -->
+    <section id="data-flow">
+      <h2>Shared request flow (all options)</h2>
+      <p class="section-lead">The gateway application behaves the same regardless of where Ollama runs. Only the inference hop changes.</p>
+      <div class="flow-box">
+        <div class="flow-steps">
+          <div class="flow-step">Browser UI</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step accent">Gateway</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">LLM (SQL gen)</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step accent">Guardrails</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">SQL Server</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">LLM (summary)</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">Answer in UI</div>
+        </div>
+        <p class="flow-caption">Two LLM calls per question. Option 2 speeds up both; Option 1 on CPU is the main bottleneck.</p>
+      </div>
+    </section>
+
+    <!-- Comparison table -->
+    <section id="comparison">
+      <h2>Side-by-side comparison</h2>
+      <p class="section-lead">Quick reference for sales, security review, and deployment planning.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Criteria</th>
+              <th>Option 1<br />Same-VM</th>
+              <th>Option 2<br />Split-VM (GPU)</th>
+              <th>Option 3<br />Cloud inference</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>VM count (client)</td>
+              <td>1</td>
+              <td>2</td>
+              <td>1</td>
+            </tr>
+            <tr>
+              <td>Typical response time</td>
+              <td class="cell-mid">Minutes</td>
+              <td class="cell-yes">Seconds</td>
+              <td class="cell-yes">Seconds</td>
+            </tr>
+            <tr>
+              <td>GPU required</td>
+              <td class="cell-no">No</td>
+              <td class="cell-yes">Yes</td>
+              <td class="cell-no">No</td>
+            </tr>
+            <tr>
+              <td>Data stays in client env</td>
+              <td class="cell-yes">Yes</td>
+              <td class="cell-yes">Yes*</td>
+              <td class="cell-no">No</td>
+            </tr>
+            <tr>
+              <td>Install complexity</td>
+              <td class="cell-yes">Low</td>
+              <td class="cell-mid">Medium</td>
+              <td class="cell-yes">Low</td>
+            </tr>
+            <tr>
+              <td>Offline / air-gap capable</td>
+              <td class="cell-yes">Yes</td>
+              <td class="cell-yes">Yes**</td>
+              <td class="cell-no">No</td>
+            </tr>
+            <tr>
+              <td>Production-ready performance</td>
+              <td class="cell-no">Poor</td>
+              <td class="cell-yes">Strong</td>
+              <td class="cell-yes">Strong</td>
+            </tr>
+            <tr>
+              <td>Matches security model doc</td>
+              <td class="cell-yes">Yes</td>
+              <td class="cell-yes">Yes</td>
+              <td class="cell-no">No</td>
+            </tr>
+            <tr>
+              <td>Best use case</td>
+              <td>POC / demo</td>
+              <td>Production</td>
+              <td>Non-sensitive only</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size: 0.82rem; color: var(--muted); margin-top: 0.75rem;">
+        * Option 2: schema, questions, and result rows are sent to the GPU VM over a private network — still client-owned, not Prelytical cloud.<br />
+        ** After initial model download, outbound internet on the GPU VM can be blocked.
+      </p>
+    </section>
+
+    <!-- Decision guide -->
+    <section id="decision">
+      <h2>Which option should we choose?</h2>
+      <p class="section-lead">A practical decision path based on what we’ve seen in client deployments and POC testing.</p>
+      <div class="decision-grid">
+        <div class="decision-card">
+          <h3><span class="decision-icon a">1</span> Start here: Option 1</h3>
+          <p>
+            Use <strong>Same-VM</strong> for the first install, demo, or security review.
+            Prove read-only SQL, guardrails, and audit logging without asking the client for GPU infrastructure.
+            Expect slow Ask responses — set that expectation upfront.
+          </p>
+        </div>
+        <div class="decision-card">
+          <h3><span class="decision-icon b">2</span> Move here for production: Option 2</h3>
+          <p>
+            Once the POC is approved, deploy a <strong>GPU inference VM</strong> in the same VPC.
+            Run <code>install/bootstrap-inference-linux.sh</code> on that box (see
+            <a href="GPU_INFERENCE_VM.md">GPU_INFERENCE_VM.md</a>).
+            Update <code>MODEL_BASE_URL=http://&lt;private-ip&gt;:11434/v1</code> on the SQL VM and skip local Ollama.
+          </p>
+        </div>
+        <div class="decision-card">
+          <h3><span class="decision-icon c">3</span> Avoid for sensitive data: Option 3</h3>
+          <p>
+            <strong>Cloud inference</strong> is only appropriate when the client explicitly allows row-level data
+            to leave their network and has contractual coverage with the API provider.
+            Prelytical Gateway’s on-prem product is designed for Options 1 and 2.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick wins -->
+    <section id="optimizations">
+      <h2>Speed optimizations (any option)</h2>
+      <p class="section-lead">These apply regardless of architecture and can improve Option 1 while you plan Option 2.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Optimization</th>
+              <th>Impact</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Smaller model (e.g. qwen2.5-coder:3b)</td>
+              <td class="cell-yes">High on CPU</td>
+              <td>Trade some SQL quality for speed</td>
+            </tr>
+            <tr>
+              <td>Skip summarization step</td>
+              <td class="cell-yes">~50% faster</td>
+              <td>Show SQL + table only; one LLM call</td>
+            </tr>
+            <tr>
+              <td>Pre-warm model on startup</td>
+              <td class="cell-mid">First query only</td>
+              <td>Avoid cold-start penalty on first Ask</td>
+            </tr>
+            <tr>
+              <td>GPU inference VM (Option 2)</td>
+              <td class="cell-yes">Transformative</td>
+              <td>Primary production path</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <footer>
+    <p>
+      Prelytical Secure SQL Gateway &middot;
+      <a href="https://github.com/Prelytical-AI/gateway">github.com/Prelytical-AI/gateway</a>
+      &middot; Generated deployment reference
+    </p>
+  </footer>
+
+</body>
+</html>

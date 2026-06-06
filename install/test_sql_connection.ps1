@@ -22,8 +22,10 @@ $code = @'
 from app.services.sqlserver import SQLServerService
 service = SQLServerService()
 ok, message = service.test_connection()
-print(f"ok={ok}")
+print("ok=" + str(ok))
 print(message)
+if not ok:
+    raise SystemExit(1)
 '@
 
 .\.venv\Scripts\python.exe -c $code
