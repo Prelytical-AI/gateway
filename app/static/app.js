@@ -291,37 +291,76 @@ async function handleChatSubmit(event) {
   pendingAttachments = [];
   renderAttachmentChips();
 
+  setChatBusy(true, "Starting…");
   const started = Date.now();
-  setChatBusy(true, "Thinking…");
   const timer = setInterval(() => {
     const secs = Math.floor((Date.now() - started) / 1000);
-    $("chat-pending-text").textContent =
-      secs < 30
-        ? `Working… ${secs}s`
-        : secs < 120
-          ? `Still working (${secs}s) — briefs and investigations take time on CPU`
-          : `Still working (${secs}s) — large jobs can take 10–20+ minutes`;
+    const base = $("chat-pending-text").textContent.replace(/ · \d+s$/, "");
+    if (base) $("chat-pending-text").textContent = `${base} · ${secs}s`;
   }, 1000);
 
   try {
-    const result = await api("/api/chat", {
+    const response = await fetch("/api/chat/stream", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, attachments }),
     });
 
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || response.statusText || "Request failed");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let resultPayload = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const chunks = buffer.split("\n\n");
+      buffer = chunks.pop() || "";
+
+      for (const chunk of chunks) {
+        if (!chunk.trim()) continue;
+        const parsed = parseSseChunk(chunk);
+        if (!parsed) continue;
+        if (parsed.event === "progress") {
+          setChatBusy(true, parsed.data.message || "Working…");
+        } else if (parsed.event === "result") {
+          resultPayload = parsed.data;
+        } else if (parsed.event === "error") {
+          throw new Error(parsed.data.detail || "Chat failed");
+        }
+      }
+    }
+
     box.querySelector('[data-id="pending-user"]')?.remove();
-    (result.messages || []).forEach((msg) => box.appendChild(renderChatMessage(msg)));
+
+    if (resultPayload?.messages?.length) {
+      resultPayload.messages.forEach((msg) => box.appendChild(renderChatMessage(msg)));
+    } else if (resultPayload?.assistant_message) {
+      if (resultPayload.user_message) {
+        box.appendChild(renderChatMessage(resultPayload.user_message));
+      }
+      box.appendChild(renderChatMessage(resultPayload.assistant_message));
+    }
+
     scrollChatToBottom();
     markChecklist("brief", true);
   } catch (err) {
     box.querySelector('[data-id="pending-user"]')?.remove();
-    const errMsg = {
-      id: "err",
-      role: "assistant",
-      content: err.message,
-      action: "error",
-    };
-    box.appendChild(renderChatMessage(errMsg));
+    box.appendChild(
+      renderChatMessage({
+        id: "err",
+        role: "assistant",
+        content: err.message,
+        action: "error",
+      })
+    );
     scrollChatToBottom();
   } finally {
     clearInterval(timer);
@@ -329,9 +368,25 @@ async function handleChatSubmit(event) {
   }
 }
 
+function parseSseChunk(chunk) {
+  const lines = chunk.split("\n");
+  let event = "message";
+  let dataLine = "";
+  for (const line of lines) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    if (line.startsWith("data:")) dataLine = line.slice(5).trim();
+  }
+  if (!dataLine) return null;
+  try {
+    return { event, data: JSON.parse(dataLine) };
+  } catch {
+    return null;
+  }
+}
+
 async function clearChat() {
   if (chatBusy) return;
-  if (!confirm("Clear this conversation? The loaded brief stays in memory.")) return;
+  if (!confirm("Clear this conversation? The loaded brief stays saved on disk.")) return;
   await api("/api/chat/clear", { method: "POST" });
   $("chat-messages").innerHTML = `
     <div class="chat-welcome">

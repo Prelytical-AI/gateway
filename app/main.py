@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -16,7 +17,7 @@ from app.services.model_client import ModelClient
 from app.services.brief_builder import build_brief_prompt, parse_brief_json
 from app.services.brief_export import export_brief_html
 from app.services.brief_renderer import normalize_and_render_brief
-from app.services.brief_session import brief_session
+from app.services.brief_session import BriefSessionStore
 from app.services.chat_agent import ChatAgent
 from app.services.chat_store import ChatStore
 from app.services.deep_dive import InvestigationService
@@ -34,12 +35,13 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 audit = AuditService()
 sql_service = SQLServerService()
 model_client = ModelClient()
+brief_session = BriefSessionStore(settings.gateway_db_path)
 investigation_service = InvestigationService(
     sql_service=sql_service,
     model_client=model_client,
     audit=audit,
 )
-chat_store = ChatStore(max_messages=settings.chat_max_messages)
+chat_store = ChatStore(settings.gateway_db_path, max_messages=settings.chat_max_messages)
 chat_agent = ChatAgent(
     chat_store=chat_store,
     brief_session=brief_session,
@@ -129,8 +131,42 @@ def create_app() -> FastAPI:
             "brief_max_entities": settings.brief_max_entities,
             "sqlserver_driver": settings.sqlserver_driver,
             "deep_dive_max_queries": settings.deep_dive_max_queries,
+            "deep_dive_timeout_seconds": settings.deep_dive_timeout_seconds,
+            "brief_timeout_seconds": settings.brief_timeout_seconds,
             "chat_max_messages": settings.chat_max_messages,
+            "gateway_db_path": settings.gateway_db_path,
         }
+
+    def _parse_chat_attachments(request: ChatRequest) -> List[Dict[str, str]]:
+        attachments: List[Dict[str, str]] = []
+        max_bytes = settings.chat_max_attachment_bytes
+        for att in request.attachments:
+            content = att.content
+            if len(content.encode("utf-8")) > max_bytes:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Attachment {att.filename} exceeds size limit.",
+                )
+            attachments.append({"filename": att.filename, "content": content})
+        return attachments
+
+    def _format_sse(event: str, data: Dict[str, Any]) -> str:
+        return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+    def _stream_chat_events(message: str, attachments: List[Dict[str, str]]) -> Iterator[str]:
+        try:
+            for event in chat_agent.handle_message_events(message, attachments):
+                if event.get("type") == "progress":
+                    yield _format_sse("progress", {"message": event.get("message", "")})
+                elif event.get("type") == "result":
+                    yield _format_sse("result", event.get("data", {}))
+            yield _format_sse("done", {"ok": True})
+        except ValueError as exc:
+            yield _format_sse("error", {"detail": str(exc)})
+        except Exception as exc:
+            logger.exception("Chat stream failed")
+            audit.log_event("error", question=message, metadata={"stage": "chat_stream", "error": str(exc)})
+            yield _format_sse("error", {"detail": str(exc)})
 
     @app.get("/api/chat/history")
     def chat_history() -> Dict[str, Any]:
@@ -143,17 +179,7 @@ def create_app() -> FastAPI:
 
     @app.post("/api/chat")
     def chat_message(request: ChatRequest) -> Dict[str, Any]:
-        attachments = []
-        max_bytes = settings.chat_max_attachment_bytes
-        for att in request.attachments:
-            content = att.content
-            if len(content.encode("utf-8")) > max_bytes:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Attachment {att.filename} exceeds size limit.",
-                )
-            attachments.append({"filename": att.filename, "content": content})
-
+        attachments = _parse_chat_attachments(request)
         try:
             result = chat_agent.handle_message(request.message.strip(), attachments)
             return result
@@ -163,6 +189,19 @@ def create_app() -> FastAPI:
             logger.exception("Chat failed")
             audit.log_event("error", question=request.message, metadata={"stage": "chat", "error": str(exc)})
             raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/api/chat/stream")
+    def chat_stream(request: ChatRequest) -> StreamingResponse:
+        attachments = _parse_chat_attachments(request)
+        return StreamingResponse(
+            _stream_chat_events(request.message.strip(), attachments),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     @app.get("/api/schema")
     def get_schema() -> Dict[str, Any]:

@@ -38,31 +38,32 @@ class Settings(BaseSettings):
     )
     sqlserver_max_rows: int = Field(default=200, alias="SQLSERVER_MAX_ROWS")
     sqlserver_query_timeout_seconds: int = Field(
-        default=30, alias="SQLSERVER_QUERY_TIMEOUT_SECONDS"
+        default=120, alias="SQLSERVER_QUERY_TIMEOUT_SECONDS"
     )
     sqlserver_connection_timeout_seconds: int = Field(
-        default=15, alias="SQLSERVER_CONNECTION_TIMEOUT_SECONDS"
+        default=30, alias="SQLSERVER_CONNECTION_TIMEOUT_SECONDS"
     )
 
     model_provider: str = Field(default="ollama", alias="MODEL_PROVIDER")
     model_base_url: str = Field(default="http://localhost:11434/v1", alias="MODEL_BASE_URL")
     model_name: str = Field(default="qwen2.5-coder:7b", alias="MODEL_NAME")
     model_api_key: str = Field(default="ollama", alias="MODEL_API_KEY")
-    model_timeout_seconds: int = Field(default=600, alias="MODEL_TIMEOUT_SECONDS")
+    model_timeout_seconds: int = Field(default=1800, alias="MODEL_TIMEOUT_SECONDS")
     model_skip_summarization: bool = Field(default=True, alias="MODEL_SKIP_SUMMARIZATION")
     model_max_schema_objects: int = Field(default=40, alias="MODEL_MAX_SCHEMA_OBJECTS")
-    brief_timeout_seconds: int = Field(default=900, alias="BRIEF_TIMEOUT_SECONDS")
+    brief_timeout_seconds: int = Field(default=3600, alias="BRIEF_TIMEOUT_SECONDS")
     brief_max_tables_with_columns: int = Field(default=18, alias="BRIEF_MAX_TABLES_WITH_COLUMNS")
     brief_max_columns_per_table: int = Field(default=8, alias="BRIEF_MAX_COLUMNS_PER_TABLE")
     brief_max_table_inventory: int = Field(default=60, alias="BRIEF_MAX_TABLE_INVENTORY")
     brief_max_entities: int = Field(default=40, alias="BRIEF_MAX_ENTITIES")
     brief_export_path: str = Field(default="", alias="BRIEF_EXPORT_PATH")
     deep_dive_max_queries: int = Field(default=5, alias="DEEP_DIVE_MAX_QUERIES")
-    deep_dive_timeout_seconds: int = Field(default=900, alias="DEEP_DIVE_TIMEOUT_SECONDS")
+    deep_dive_timeout_seconds: int = Field(default=1800, alias="DEEP_DIVE_TIMEOUT_SECONDS")
     chat_max_messages: int = Field(default=40, alias="CHAT_MAX_MESSAGES")
     chat_max_attachment_bytes: int = Field(default=2_000_000, alias="CHAT_MAX_ATTACHMENT_BYTES")
 
     audit_db_path: str = Field(default="./prelytical_audit.sqlite3", alias="AUDIT_DB_PATH")
+    gateway_db_path: str = Field(default="./prelytical_gateway.sqlite3", alias="GATEWAY_DB_PATH")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
     guardrails_require_select_only: bool = Field(
@@ -103,6 +104,18 @@ class Settings(BaseSettings):
     @classmethod
     def ensure_positive_limit(cls, value: int) -> int:
         return max(value, 1)
+
+    @field_validator(
+        "model_timeout_seconds",
+        "brief_timeout_seconds",
+        "deep_dive_timeout_seconds",
+        "sqlserver_query_timeout_seconds",
+        "sqlserver_connection_timeout_seconds",
+        mode="after",
+    )
+    @classmethod
+    def ensure_minimum_timeout(cls, value: int) -> int:
+        return max(value, 30)
 
     @property
     def allowed_schemas(self) -> List[str]:

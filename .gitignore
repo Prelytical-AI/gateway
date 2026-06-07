@@ -2,6 +2,7 @@
 .venv/
 .pytest_cache/
 prelytical_audit.sqlite3
+prelytical_gateway.sqlite3
 __pycache__/
 *.pyc
 .DS_Store

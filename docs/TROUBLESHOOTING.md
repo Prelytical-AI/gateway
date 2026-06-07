@@ -126,15 +126,17 @@ This POC does **not** require Docker. Use native Python + local SQL Server + loc
 .\install\test_ollama_connection.ps1
 ```
 
-3. **Use CPU-friendly `.env` defaults** (in `.env.example`):
+3. **Use CPU-friendly `.env` defaults** (in `.env.example` — tuned for slow CPU-only VMs):
 
 ```env
-MODEL_TIMEOUT_SECONDS=600
+MODEL_TIMEOUT_SECONDS=1800
+BRIEF_TIMEOUT_SECONDS=3600
+DEEP_DIVE_TIMEOUT_SECONDS=1800
 MODEL_SKIP_SUMMARIZATION=true
 MODEL_MAX_SCHEMA_OBJECTS=40
 ```
 
-   Restart Prelytical after editing `.env`.
+   Restart Prelytical after editing `.env`. A single chat turn on CPU can take many minutes; investigations run several model calls in sequence.
 
 4. **Smaller model** if still too slow:
 

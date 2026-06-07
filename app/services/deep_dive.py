@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 from app.core.config import Settings, settings as default_settings
 from app.services.audit import AuditService
@@ -51,11 +51,41 @@ class InvestigationService:
         question: str,
         opportunity_index: Optional[int] = None,
         brief_session: BriefSessionStore,
+        on_progress: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
+        gen = self.run_events(
+            question=question,
+            opportunity_index=opportunity_index,
+            brief_session=brief_session,
+        )
+        result: Optional[Dict[str, Any]] = None
+        while True:
+            try:
+                event = next(gen)
+                if on_progress and event.get("type") == "progress":
+                    on_progress(event.get("message", ""))
+            except StopIteration as stopped:
+                result = stopped.value
+                break
+        if result is None:
+            raise RuntimeError("Investigation did not return a result.")
+        return result
+
+    def run_events(
+        self,
+        *,
+        question: str,
+        opportunity_index: Optional[int] = None,
+        brief_session: BriefSessionStore,
+    ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+        def progress(msg: str) -> Dict[str, Any]:
+            return {"type": "progress", "message": msg}
+
         question = question.strip()
         if not question:
             raise ValueError("Question is required.")
 
+        yield progress("Starting investigation…")
         mode, opp_index = self._resolve_mode(question, opportunity_index, brief_session)
         opportunity: Optional[Dict[str, Any]] = None
         brief_ctx = brief_session.get_context() if brief_session.is_loaded() else {}
@@ -74,6 +104,7 @@ class InvestigationService:
         )
 
         schema_metadata = self.sql_service.get_allowed_schema_metadata()
+        yield progress("Planning investigation queries…")
         plan = self._create_plan(
             question=question,
             mode=mode,
@@ -90,12 +121,15 @@ class InvestigationService:
         )
 
         for i, planned in enumerate(planned_queries[:max_queries]):
+            purpose = planned.get("purpose") or f"Query {i + 1}"
+            yield progress(f"Running query {i + 1} of {max_queries}: {purpose}")
             step = self._run_planned_query(planned, schema_metadata, steps)
             steps.append(step)
             if step.get("error") and i == 0:
                 break
 
         while len(steps) < max_queries and self._should_continue(question, schema_metadata, steps):
+            yield progress("Planning follow-up query…")
             next_spec = self._plan_next_query(question, schema_metadata, steps)
             if not next_spec.get("continue"):
                 break
@@ -103,11 +137,13 @@ class InvestigationService:
                 "purpose": next_spec.get("purpose") or "Follow-up query",
                 "question_for_sql": next_spec.get("question_for_sql") or question,
             }
+            yield progress(f"Running follow-up: {planned['purpose']}")
             step = self._run_planned_query(planned, schema_metadata, steps)
             steps.append(step)
             if next_spec.get("is_final"):
                 break
 
+        yield progress("Synthesizing findings…")
         synthesis = self._synthesize(
             question=question,
             mode=mode,
@@ -116,6 +152,7 @@ class InvestigationService:
         )
 
         report_title = synthesis.get("title") or plan.get("investigation_title") or "Data Investigation"
+        yield progress("Building HTML report…")
         html_report = render_investigation_html(
             title=report_title,
             database_name=self.config.sqlserver_database,

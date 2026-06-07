@@ -1,18 +1,48 @@
+import tempfile
+from pathlib import Path
+
 from app.services.brief_session import BriefSessionStore
 from app.services.chat_agent import _heuristic_route, _is_brief_content
 from app.services.chat_store import ChatStore
 
 
-def test_chat_store_remembers_messages():
-    store = ChatStore(max_messages=10)
-    store.add_user_message("hello")
-    store.add_assistant_message("hi there", action="reply")
-    msgs = store.list_messages()
-    assert len(msgs) == 2
-    assert msgs[0]["role"] == "user"
-    assert msgs[1]["role"] == "assistant"
-    model_hist = store.recent_for_model()
-    assert len(model_hist) == 2
+def test_chat_store_persists_across_instances():
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Path(tmp) / "test.sqlite3"
+        store1 = ChatStore(db, max_messages=10)
+        store1.add_user_message("hello")
+        store1.add_assistant_message("hi there", action="reply")
+
+        store2 = ChatStore(db, max_messages=10)
+        msgs = store2.list_messages()
+        assert len(msgs) == 2
+        assert msgs[0]["content"] == "hello"
+        assert msgs[1]["content"] == "hi there"
+
+
+def test_brief_session_persists_across_instances():
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Path(tmp) / "test.sqlite3"
+        session1 = BriefSessionStore(db)
+        session1.import_content(
+            json_text='{"top_signal_opportunities": [{"title": "Revenue", "indicators": ["revenue"]}], "executive_summary": "Demo"}',
+            database_name="DemoDB",
+        )
+
+        session2 = BriefSessionStore(db)
+        summary = session2.summary()
+        assert summary["loaded"] is True
+        assert summary["opportunity_count"] == 1
+        assert session2.get_opportunity(1)["title"] == "Revenue"
+
+
+def test_chat_store_clear():
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Path(tmp) / "test.sqlite3"
+        store = ChatStore(db)
+        store.add_user_message("x")
+        store.clear()
+        assert store.list_messages() == []
 
 
 def test_heuristic_route_investigate():
@@ -33,5 +63,6 @@ def test_is_brief_content():
 
 
 def test_brief_session_summary_empty():
-    session = BriefSessionStore()
-    assert session.summary()["loaded"] is False
+    with tempfile.TemporaryDirectory() as tmp:
+        session = BriefSessionStore(Path(tmp) / "test.sqlite3")
+        assert session.summary()["loaded"] is False

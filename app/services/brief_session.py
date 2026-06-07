@@ -1,18 +1,25 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.services.brief_import import parse_brief_content
+from app.services.gateway_db import connect_gateway_db, ensure_gateway_schema
 
 
 class BriefSessionStore:
-    """In-memory store for the active executive brief (single VM / single user POC)."""
+    """SQLite-backed store for the active executive brief (single-user POC)."""
 
-    def __init__(self) -> None:
-        self._payload: Optional[Dict[str, Any]] = None
+    def __init__(self, db_path: str | Path) -> None:
+        self.db_path = Path(db_path)
+        ensure_gateway_schema(self.db_path)
+        self._payload: Optional[Dict[str, Any]] = self._load()
 
     def clear(self) -> None:
         self._payload = None
+        self._save()
 
     def set_from_generation(
         self,
@@ -32,6 +39,7 @@ class BriefSessionStore:
             "opportunities": opportunities,
             "source": "generated",
         }
+        self._save()
         return self.summary()
 
     def import_content(
@@ -52,6 +60,7 @@ class BriefSessionStore:
             "opportunities": parsed.get("opportunities", []),
             "source": "imported",
         }
+        self._save()
         return self.summary()
 
     def is_loaded(self) -> bool:
@@ -92,5 +101,27 @@ class BriefSessionStore:
             return {}
         return dict(self._payload)
 
+    def _load(self) -> Optional[Dict[str, Any]]:
+        with connect_gateway_db(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM brief_session WHERE id = 1"
+            ).fetchone()
+        if not row or not row["payload_json"]:
+            return None
+        return json.loads(row["payload_json"])
 
-brief_session = BriefSessionStore()
+    def _save(self) -> None:
+        updated_at = datetime.now(timezone.utc).isoformat()
+        payload_json = json.dumps(self._payload) if self._payload else None
+        with connect_gateway_db(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO brief_session (id, payload_json, updated_at)
+                VALUES (1, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  payload_json = excluded.payload_json,
+                  updated_at = excluded.updated_at
+                """,
+                (payload_json, updated_at),
+            )
+            conn.commit()

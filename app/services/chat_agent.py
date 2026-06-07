@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 from app.core.config import Settings, settings as default_settings
 from app.services.audit import AuditService
@@ -24,6 +24,9 @@ from app.services.sqlserver import SQLServerService
 
 logger = logging.getLogger(__name__)
 
+ProgressEvent = Dict[str, Any]
+ChatEvent = Dict[str, Any]
+
 BRIEF_HINTS = re.compile(
     r"\b(executive brief|data readiness|readiness brief|generate.{0,20}brief|metadata.{0,20}brief)\b",
     re.IGNORECASE,
@@ -33,6 +36,14 @@ INVESTIGATE_HINTS = re.compile(
     r"find where|data landscape|row.?level|actually (do|run)|prove it|explore)\b",
     re.IGNORECASE,
 )
+
+ACTION_LABELS = {
+    "brief": "executive brief generation",
+    "investigate": "multi-step investigation",
+    "ask": "SQL query",
+    "reply": "conversation",
+    "import": "brief import",
+}
 
 
 class ChatAgent:
@@ -64,52 +75,73 @@ class ChatAgent:
         message: str,
         attachments: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
+        result: Optional[Dict[str, Any]] = None
+        for event in self.handle_message_events(message, attachments):
+            if event.get("type") == "result":
+                result = event["data"]
+        if result is None:
+            raise RuntimeError("Chat handler did not produce a result.")
+        return result
+
+    def handle_message_events(
+        self,
+        message: str,
+        attachments: Optional[List[Dict[str, str]]] = None,
+    ) -> Generator[ChatEvent, None, None]:
         message = (message or "").strip()
         attachments = attachments or []
 
         if not message and not attachments:
             raise ValueError("Send a message or attach a file.")
 
+        yield _progress("Saving your message…")
         user_msg = self.chat_store.add_user_message(
             message or "(file attached)",
             attachments=[{"filename": a.get("filename", "file")} for a in attachments],
         )
 
-        import_note = self._import_attachments(attachments)
+        import_note = ""
+        if attachments:
+            yield _progress("Checking attachments…")
+            import_note = self._import_attachments(attachments)
+
         brief_summary = self.brief_session.summary()
 
+        yield _progress("Figuring out what to do…")
         route = self._route(message or "Use the attached brief.", brief_summary, attachments)
         action = route.get("action", "reply")
         task = (route.get("task") or message or "").strip()
+        yield _progress(f"Running: {ACTION_LABELS.get(action, action)}")
 
         if import_note and action == "reply" and not message:
-            content = import_note
-            assistant = self.chat_store.add_assistant_message(content, action="import")
-            return self._response(user_msg, assistant)
+            assistant = self.chat_store.add_assistant_message(import_note, action="import")
+            yield _result(self._response(user_msg, assistant))
+            return
 
         try:
             if action == "brief":
-                assistant = self._run_brief(task, route)
+                assistant = yield from self._run_brief_events(task, route)
             elif action == "investigate":
-                assistant = self._run_investigate(task, route)
+                assistant = yield from self._run_investigate_events(task, route)
             elif action == "ask":
-                assistant = self._run_ask(task)
+                assistant = yield from self._run_ask_events(task)
             else:
-                assistant = self._run_reply(message, brief_summary)
+                assistant = yield from self._run_reply_events(message, brief_summary)
         except Exception as exc:
             logger.exception("Chat action failed")
             assistant = self.chat_store.add_assistant_message(
                 f"Something went wrong: {exc}",
                 action="error",
             )
-            return self._response(user_msg, assistant)
+            yield _result(self._response(user_msg, assistant))
+            return
 
-        if import_note and assistant.get("content"):
-            assistant["content"] = f"{import_note}\n\n{assistant['content']}"
-        elif import_note:
-            assistant["content"] = import_note
+        if import_note:
+            merged = f"{import_note}\n\n{assistant['content']}" if assistant.get("content") else import_note
+            self.chat_store.update_message(assistant["id"], content=merged)
+            assistant["content"] = merged
 
-        return self._response(user_msg, assistant)
+        yield _result(self._response(user_msg, assistant))
 
     def _import_attachments(self, attachments: List[Dict[str, str]]) -> str:
         notes: List[str] = []
@@ -130,7 +162,10 @@ class ChatAgent:
                 f"Loaded brief \"{summary.get('title')}\" with "
                 f"{summary.get('opportunity_count', 0)} opportunities."
             )
-            self.audit.log_event("brief_imported", metadata={"source": "chat_attachment", "filename": filename})
+            self.audit.log_event(
+                "brief_imported",
+                metadata={"source": "chat_attachment", "filename": filename},
+            )
         return "\n".join(notes)
 
     def _route(
@@ -139,7 +174,9 @@ class ChatAgent:
         brief_summary: Dict[str, Any],
         attachments: List[Dict[str, str]],
     ) -> Dict[str, Any]:
-        has_brief_att = any(_is_brief_content(a.get("filename", ""), a.get("content", "")) for a in attachments)
+        has_brief_att = any(
+            _is_brief_content(a.get("filename", ""), a.get("content", "")) for a in attachments
+        )
         history = self.chat_store.recent_for_model()
 
         try:
@@ -160,7 +197,12 @@ class ChatAgent:
 
         return _heuristic_route(message, brief_summary.get("loaded", False), has_brief_att)
 
-    def _run_brief(self, task: str, route: Dict[str, Any]) -> Dict[str, Any]:
+    def _run_brief_events(
+        self,
+        task: str,
+        route: Dict[str, Any],
+    ) -> Generator[ChatEvent, None, Dict[str, Any]]:
+        yield _progress("Loading schema metadata…")
         title = route.get("brief_title") or "Executive Data Readiness Brief"
         objective = route.get("brief_objective") or task or (
             "Assess what this database is well positioned to answer for executives."
@@ -174,7 +216,9 @@ class ChatAgent:
             schema_metadata=schema_metadata,
             database_name=self.config.sqlserver_database,
         )
+        yield _progress("Generating executive brief (may take several minutes on CPU)…")
         raw = self.model_client.generate_brief(system_prompt, user_prompt)
+        yield _progress("Parsing and rendering HTML report…")
         parsed = parse_brief_json(raw)
         output = normalize_and_render_brief(
             parsed,
@@ -189,6 +233,7 @@ class ChatAgent:
             title=title,
             database_name=self.config.sqlserver_database,
         )
+        yield _progress("Saving brief to session…")
         self.brief_session.set_from_generation(
             title=title,
             output=output,
@@ -219,18 +264,35 @@ class ChatAgent:
             },
         )
 
-    def _run_investigate(self, task: str, route: Dict[str, Any]) -> Dict[str, Any]:
+    def _run_investigate_events(
+        self,
+        task: str,
+        route: Dict[str, Any],
+    ) -> Generator[ChatEvent, None, Dict[str, Any]]:
         opp_index = route.get("opportunity_index")
         if isinstance(opp_index, float):
             opp_index = int(opp_index)
         if opp_index is not None and not isinstance(opp_index, int):
             opp_index = None
 
-        result = self.investigation_service.run(
+        gen = self.investigation_service.run_events(
             question=task,
             opportunity_index=opp_index,
             brief_session=self.brief_session,
         )
+        result: Optional[Dict[str, Any]] = None
+        while True:
+            try:
+                event = next(gen)
+                if event.get("type") == "progress":
+                    yield event
+            except StopIteration as stopped:
+                result = stopped.value
+                break
+
+        if result is None:
+            raise RuntimeError("Investigation did not return a result.")
+
         findings = result.get("key_findings") or []
         findings_text = "\n".join(f"- {f}" for f in findings[:6])
         content = result.get("executive_summary") or "Investigation complete."
@@ -251,7 +313,8 @@ class ChatAgent:
             },
         )
 
-    def _run_ask(self, task: str) -> Dict[str, Any]:
+    def _run_ask_events(self, task: str) -> Generator[ChatEvent, None, Dict[str, Any]]:
+        yield _progress("Loading schema…")
         schema_metadata = self.sql_service.get_allowed_schema_metadata()
         system_prompt, user_prompt = build_sql_generation_prompt(
             question=task,
@@ -259,6 +322,7 @@ class ChatAgent:
             max_rows=self.config.sqlserver_max_rows,
             max_schema_objects=self.config.model_max_schema_objects,
         )
+        yield _progress("Generating SQL…")
         generated_sql = self.model_client.generate_sql(system_prompt, user_prompt)
         validation = validate_sql(generated_sql)
 
@@ -270,10 +334,12 @@ class ChatAgent:
                 artifact={"type": "sql", "sql": generated_sql, "valid": False},
             )
 
+        yield _progress("Running query…")
         query_result = self.sql_service.execute_readonly_query(validation.normalized_sql)
         if self.config.model_skip_summarization:
             answer = f"Query returned {query_result['row_count']} row(s)."
         else:
+            yield _progress("Summarizing results…")
             summary_system, summary_user = build_summarization_prompt(
                 question=task,
                 sql=validation.normalized_sql,
@@ -298,7 +364,12 @@ class ChatAgent:
             },
         )
 
-    def _run_reply(self, message: str, brief_summary: Dict[str, Any]) -> Dict[str, Any]:
+    def _run_reply_events(
+        self,
+        message: str,
+        brief_summary: Dict[str, Any],
+    ) -> Generator[ChatEvent, None, Dict[str, Any]]:
+        yield _progress("Thinking…")
         history = self.chat_store.recent_for_model()
         system, user = build_reply_prompt(
             message=message,
@@ -316,6 +387,14 @@ class ChatAgent:
             "assistant_message": assistant_msg,
             "messages": [user_msg, assistant_msg],
         }
+
+
+def _progress(message: str) -> ProgressEvent:
+    return {"type": "progress", "message": message}
+
+
+def _result(data: Dict[str, Any]) -> ChatEvent:
+    return {"type": "result", "data": data}
 
 
 def _is_brief_content(filename: str, content: str) -> bool:
