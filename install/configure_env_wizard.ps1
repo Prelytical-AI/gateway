@@ -27,7 +27,7 @@ $sqlPassword = Read-Host "SQL password" -AsSecureString
 $sqlPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
     [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sqlPassword)
 )
-$odbcDriver = Read-Default "ODBC driver" "ODBC Driver 18 for SQL Server"
+$odbcDriver = Read-Default "ODBC driver (17 or 18 for SQL Server)" "ODBC Driver 18 for SQL Server"
 
 Write-Host ""
 Write-Host "Where does Ollama run?" -ForegroundColor Cyan

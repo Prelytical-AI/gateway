@@ -83,6 +83,11 @@ def create_app() -> FastAPI:
             "model_skip_summarization": settings.model_skip_summarization,
             "model_timeout_seconds": settings.model_timeout_seconds,
             "brief_export_configured": bool(settings.brief_export_path.strip()),
+            "brief_max_tables_with_columns": settings.brief_max_tables_with_columns,
+            "brief_max_columns_per_table": settings.brief_max_columns_per_table,
+            "brief_max_table_inventory": settings.brief_max_table_inventory,
+            "brief_max_entities": settings.brief_max_entities,
+            "sqlserver_driver": settings.sqlserver_driver,
         }
 
     @app.get("/api/schema")

@@ -131,7 +131,10 @@ class SQLServerService:
 
     def _connect(self):
         pyodbc = _import_pyodbc()
-        return pyodbc.connect(self.config.connection_string())
+        return pyodbc.connect(
+            self.config.connection_string(),
+            timeout=self.config.sqlserver_connection_timeout_seconds,
+        )
 
 
 def _json_safe_value(value: Any) -> Any:

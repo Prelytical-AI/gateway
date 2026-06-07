@@ -6,9 +6,33 @@
 
 **Fix:**
 
-1. Install [Microsoft ODBC Driver 18 for SQL Server](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server)
+1. Install [ODBC Driver 18](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server) or [ODBC Driver 17](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server) (64-bit)
 2. Run `Get-OdbcDriver | Where-Object {$_.Name -like "*SQL Server*"}`
-3. Update `SQLSERVER_DRIVER` in `.env` to match installed driver name
+3. Set `SQLSERVER_DRIVER` in `.env` to the **exact** driver name (e.g. `ODBC Driver 17 for SQL Server`)
+
+## ODBC Driver 17 vs 18
+
+Both drivers are supported. Use a 64-bit driver with 64-bit Python.
+
+**Driver 17 (common on older client VMs):**
+
+```env
+SQLSERVER_DRIVER=ODBC Driver 17 for SQL Server
+SQLSERVER_ENCRYPT=no
+SQLSERVER_TRUST_SERVER_CERTIFICATE=true
+```
+
+**Driver 18 (default in `.env.example`):**
+
+```env
+SQLSERVER_DRIVER=ODBC Driver 18 for SQL Server
+SQLSERVER_ENCRYPT=yes
+SQLSERVER_TRUST_SERVER_CERTIFICATE=true
+```
+
+Passwords containing `;` or `}` are automatically escaped in the connection string.
+
+Restart the gateway after changing `.env` (settings are cached for the process lifetime).
 
 ## SQL login failed
 

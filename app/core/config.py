@@ -4,6 +4,8 @@ from typing import List
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.odbc_utils import escape_odbc_value, normalize_encrypt_for_driver
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -38,6 +40,9 @@ class Settings(BaseSettings):
     sqlserver_query_timeout_seconds: int = Field(
         default=30, alias="SQLSERVER_QUERY_TIMEOUT_SECONDS"
     )
+    sqlserver_connection_timeout_seconds: int = Field(
+        default=15, alias="SQLSERVER_CONNECTION_TIMEOUT_SECONDS"
+    )
 
     model_provider: str = Field(default="ollama", alias="MODEL_PROVIDER")
     model_base_url: str = Field(default="http://localhost:11434/v1", alias="MODEL_BASE_URL")
@@ -47,6 +52,10 @@ class Settings(BaseSettings):
     model_skip_summarization: bool = Field(default=True, alias="MODEL_SKIP_SUMMARIZATION")
     model_max_schema_objects: int = Field(default=40, alias="MODEL_MAX_SCHEMA_OBJECTS")
     brief_timeout_seconds: int = Field(default=900, alias="BRIEF_TIMEOUT_SECONDS")
+    brief_max_tables_with_columns: int = Field(default=18, alias="BRIEF_MAX_TABLES_WITH_COLUMNS")
+    brief_max_columns_per_table: int = Field(default=8, alias="BRIEF_MAX_COLUMNS_PER_TABLE")
+    brief_max_table_inventory: int = Field(default=60, alias="BRIEF_MAX_TABLE_INVENTORY")
+    brief_max_entities: int = Field(default=40, alias="BRIEF_MAX_ENTITIES")
     brief_export_path: str = Field(default="", alias="BRIEF_EXPORT_PATH")
 
     audit_db_path: str = Field(default="./prelytical_audit.sqlite3", alias="AUDIT_DB_PATH")
@@ -77,6 +86,18 @@ class Settings(BaseSettings):
             return value.strip().lower() in {"1", "true", "yes", "on"}
         return bool(value)
 
+    @field_validator(
+        "brief_max_tables_with_columns",
+        "brief_max_columns_per_table",
+        "brief_max_table_inventory",
+        "brief_max_entities",
+        "model_max_schema_objects",
+        mode="after",
+    )
+    @classmethod
+    def ensure_positive_limit(cls, value: int) -> int:
+        return max(value, 1)
+
     @property
     def allowed_schemas(self) -> List[str]:
         return [s.strip().lower() for s in self.sqlserver_allowed_schemas.split(",") if s.strip()]
@@ -99,17 +120,32 @@ class Settings(BaseSettings):
             return f"{self.sqlserver_host}\\{self.sqlserver_instance},{self.sqlserver_port}"
         return f"{self.sqlserver_host},{self.sqlserver_port}"
 
+    @property
+    def effective_sql_encrypt(self) -> str:
+        return normalize_encrypt_for_driver(self.sqlserver_driver, self.sqlserver_encrypt)
+
+    @property
+    def uses_modern_odbc_driver(self) -> bool:
+        """True for ODBC Driver 18+ (LongAsMax and mandatory Encrypt support)."""
+        name = self.sqlserver_driver.lower()
+        for version in ("19", "18"):
+            if f"driver {version}" in name:
+                return True
+        return False
+
     def connection_string(self) -> str:
         parts = [
             f"DRIVER={{{self.sqlserver_driver}}}",
             f"SERVER={self.sql_server_spec}",
-            f"DATABASE={self.sqlserver_database}",
-            f"UID={self.sqlserver_username}",
-            f"PWD={self.sqlserver_password}",
-            f"Encrypt={self.sqlserver_encrypt}",
+            f"DATABASE={escape_odbc_value(self.sqlserver_database)}",
+            f"UID={escape_odbc_value(self.sqlserver_username)}",
+            f"PWD={escape_odbc_value(self.sqlserver_password)}",
+            f"Encrypt={self.effective_sql_encrypt}",
         ]
         if self.sqlserver_trust_server_certificate:
             parts.append("TrustServerCertificate=yes")
+        if self.uses_modern_odbc_driver:
+            parts.append("LongAsMax=yes")
         return ";".join(parts) + ";"
 
 

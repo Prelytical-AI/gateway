@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prelytical — Enterprise Architecture (Hybrid)</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --text: #0f2744;
+      --muted: #5b6b7f;
+      --border: #d8e0ea;
+      --primary: #0d9488;
+      --primary-light: #ccfbf1;
+      --primary-dark: #0b7a70;
+      --navy: #0f2744;
+      --navy-mid: #16365c;
+      --azure: #0078d4;
+      --azure-light: #e8f4fd;
+      --azure-dark: #005a9e;
+      --client: #7c3aed;
+      --client-light: #f3e8ff;
+      --client-dark: #5b21b6;
+      --danger: #b42318;
+      --danger-bg: #fef3f2;
+      --success: #067647;
+      --success-bg: #ecfdf3;
+      --warning: #b54708;
+      --warning-bg: #fffaeb;
+      --shadow: 0 8px 24px rgba(15, 39, 68, 0.08);
+      --shadow-lg: 0 16px 48px rgba(15, 39, 68, 0.12);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 45%, #1a4a6e 100%);
+      color: #fff;
+      padding: 3.5rem 2rem 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 88% 15%, rgba(0, 120, 212, 0.22) 0%, transparent 42%),
+        radial-gradient(circle at 12% 85%, rgba(13, 148, 136, 0.2) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(13, 148, 136, 0.25);
+      border: 1px solid rgba(13, 148, 136, 0.5);
+      color: #99f6e4;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    .hero h1 {
+      margin: 0 0 0.75rem;
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 720px;
+      font-size: 1.1rem;
+      color: #c7d6ea;
+    }
+
+    .hero-tagline {
+      margin-top: 1.25rem;
+      padding: 0.85rem 1.15rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      color: #e2e8f0;
+      max-width: 680px;
+    }
+
+    .hero-tagline strong { color: #99f6e4; }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 2rem 4rem;
+    }
+
+    section { margin-top: 3rem; }
+
+    section > h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin: 0 0 0.5rem;
+      letter-spacing: -0.01em;
+    }
+
+    section > .section-lead {
+      color: var(--muted);
+      margin: 0 0 1.75rem;
+      max-width: 720px;
+    }
+
+    .intro-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem 2rem;
+      margin-top: -2.5rem;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      z-index: 1;
+    }
+
+    .intro-card p { margin: 0 0 1rem; color: var(--muted); }
+    .intro-card p:last-child { margin-bottom: 0; }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .intro-stat {
+      text-align: center;
+      padding: 0.75rem;
+    }
+
+    .intro-stat strong {
+      display: block;
+      font-size: 1.35rem;
+      color: var(--primary);
+      line-height: 1.2;
+    }
+
+    .intro-stat span {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    /* Zone architecture */
+    .arch-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .arch-card-header {
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background: #fafbfc;
+    }
+
+    .arch-card-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .arch-card-header p {
+      margin: 0.35rem 0 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .diagram {
+      padding: 2rem 2.5rem;
+      background: #f8fafc;
+      font-family: "Cascadia Code", "SF Mono", Consolas, monospace;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre;
+      color: #334155;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .diagram .azure { color: var(--azure-dark); font-weight: 600; }
+    .diagram .client { color: var(--client-dark); font-weight: 600; }
+    .diagram .highlight { color: var(--primary-dark); font-weight: 600; }
+    .diagram .dim { color: #94a3b8; }
+    .diagram .warn { color: var(--warning); }
+
+    .zone-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .zone-block {
+      padding: 1.75rem 2rem;
+    }
+
+    .zone-block.azure {
+      background: var(--azure-light);
+      border-right: 1px solid var(--border);
+    }
+
+    .zone-block.client {
+      background: var(--client-light);
+    }
+
+    .zone-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+
+    .zone-label.azure { color: var(--azure-dark); }
+    .zone-label.client { color: var(--client-dark); }
+
+    .zone-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .zone-dot.azure { background: var(--azure); }
+    .zone-dot.client { background: var(--client); }
+
+    .zone-block ul {
+      margin: 0;
+      padding-left: 1.15rem;
+      font-size: 0.92rem;
+      color: var(--text);
+    }
+
+    .zone-block li { margin-bottom: 0.45rem; }
+    .zone-block li:last-child { margin-bottom: 0; }
+
+    .connector-bar {
+      padding: 1rem 2rem;
+      background: linear-gradient(90deg, var(--azure-light), #f8fafc, var(--client-light));
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .connector-bar strong { color: var(--text); }
+
+    /* Tables */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    thead {
+      background: linear-gradient(135deg, var(--navy), var(--navy-mid));
+      color: #fff;
+    }
+
+    th, td {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th { font-weight: 600; font-size: 0.82rem; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+
+    td:first-child { font-weight: 600; color: var(--text); }
+
+    .cell-yes { color: var(--success); font-weight: 600; }
+    .cell-no { color: var(--danger); font-weight: 600; }
+    .cell-mid { color: var(--warning); font-weight: 600; }
+
+    .pill {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .pill.azure { background: var(--azure-light); color: var(--azure-dark); }
+    .pill.client { background: var(--client-light); color: var(--client-dark); }
+    .pill.both { background: var(--warning-bg); color: var(--warning); }
+
+    /* Evolution timeline */
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .timeline-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+
+    .timeline-card.current {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary), var(--shadow);
+    }
+
+    .timeline-card.target {
+      border-color: var(--azure);
+      box-shadow: 0 0 0 1px var(--azure), var(--shadow-lg);
+    }
+
+    .timeline-step {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .timeline-card h3 {
+      margin: 0 0 0.65rem;
+      font-size: 1.05rem;
+    }
+
+    .timeline-card p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .timeline-card ul {
+      margin: 0.75rem 0 0;
+      padding-left: 1.15rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .timeline-card li { margin-bottom: 0.35rem; }
+
+    /* Decision cards */
+    .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .decision-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    .decision-card.gate {
+      border-top: 4px solid var(--primary);
+    }
+
+    .decision-card h3 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+    }
+
+    .decision-card p, .decision-card ul {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .decision-card ul {
+      margin-top: 0.65rem;
+      padding-left: 1.15rem;
+    }
+
+    .decision-card li { margin-bottom: 0.4rem; }
+
+    /* Flow */
+    .flow-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      box-shadow: var(--shadow);
+    }
+
+    .flow-steps {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem 0.25rem;
+    }
+
+    .flow-step {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.65rem 1rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .flow-step.azure {
+      background: var(--azure-light);
+      border-color: rgba(0, 120, 212, 0.3);
+      color: var(--azure-dark);
+    }
+
+    .flow-step.client {
+      background: var(--client-light);
+      border-color: rgba(124, 58, 237, 0.3);
+      color: var(--client-dark);
+    }
+
+    .flow-step.accent {
+      background: var(--primary-light);
+      border-color: rgba(13, 148, 136, 0.35);
+      color: var(--primary-dark);
+    }
+
+    .flow-arrow { color: #94a3b8; font-size: 1.1rem; }
+
+    .flow-caption {
+      text-align: center;
+      margin: 1.25rem 0 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    /* Callout */
+    .callout {
+      background: var(--primary-light);
+      border: 1px solid rgba(13, 148, 136, 0.35);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .callout p {
+      margin: 0;
+      font-size: 0.92rem;
+      color: var(--primary-dark);
+    }
+
+    .callout.warn {
+      background: var(--warning-bg);
+      border-color: rgba(181, 71, 8, 0.25);
+    }
+
+    .callout.warn p { color: var(--warning); }
+
+    /* Checklist */
+    .checklist {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem 2rem;
+      box-shadow: var(--shadow);
+    }
+
+    .checklist ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0.65rem 1.5rem;
+    }
+
+    .checklist li {
+      font-size: 0.9rem;
+      color: var(--muted);
+      padding-left: 1.5rem;
+      position: relative;
+    }
+
+    .checklist li::before {
+      content: "☐";
+      position: absolute;
+      left: 0;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .pitch-box {
+      background: linear-gradient(135deg, var(--navy), var(--navy-mid));
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 2rem 2.25rem;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .pitch-box blockquote {
+      margin: 0;
+      font-size: 1.15rem;
+      line-height: 1.55;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+
+    .pitch-box cite {
+      display: block;
+      margin-top: 1rem;
+      font-size: 0.82rem;
+      font-style: normal;
+      color: #94a3b8;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: 0.82rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    footer a { color: var(--primary); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    code {
+      font-family: "Cascadia Code", "SF Mono", Consolas, monospace;
+      font-size: 0.88em;
+      background: #eef2f7;
+      padding: 0.12rem 0.35rem;
+      border-radius: 4px;
+    }
+
+    @media (max-width: 768px) {
+      .zone-grid { grid-template-columns: 1fr; }
+      .zone-block.azure {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .diagram {
+        padding: 1.5rem 1.25rem;
+        font-size: 0.72rem;
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .hero { padding: 2.5rem 1.25rem 3rem; }
+      .container { padding: 0 1.25rem 3rem; }
+      .intro-card { margin-top: -1.5rem; padding: 1.25rem; }
+      .flow-arrow { display: none; }
+      .flow-steps { flex-direction: column; }
+    }
+
+    @media print {
+      .hero { padding: 1.5rem; }
+      .arch-card, .timeline-card { break-inside: avoid; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="hero">
+    <div class="hero-inner">
+      <span class="badge">Enterprise Target Architecture</span>
+      <h1>Hybrid Prelytical<br />Azure Product + Client GPU Inference</h1>
+      <p>
+        The production-ready shape for regulated clients: Prelytical hosts the executive experience
+        in Azure; the warehouse, SQL execution, and AI inference stay on the client network.
+      </p>
+      <div class="hero-tagline">
+        <strong>One sentence:</strong> Prelytical runs in Azure for the product; your data and AI stay on your network on a private GPU — fast, governed, and not sent to OpenAI.
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <div class="intro-card">
+      <p>
+        Enterprise rollout comes down to <strong>two gating decisions</strong>: provision
+        <strong>GPU inference on client infrastructure</strong>, and align with security on
+        <strong>what warehouse context may reach the model</strong>. Everything else — curated views,
+        read-only SQL, audit, patching — is implementation inside that boundary.
+      </p>
+      <div class="intro-grid">
+        <div class="intro-stat"><strong>Azure</strong><span>UI, API, governance</span></div>
+        <div class="intro-stat"><strong>Client net</strong><span>SQL + GPU + Ollama</span></div>
+        <div class="intro-stat"><strong>~$400/mo</strong><span>Typical GPU VM (AWS/Azure)</span></div>
+        <div class="intro-stat"><strong>Seconds</strong><span>Brief &amp; Ask on GPU</span></div>
+      </div>
+    </div>
+
+    <!-- Main architecture -->
+    <section id="topology">
+      <h2>Target topology</h2>
+      <p class="section-lead">
+        Two trust zones. The cloud zone is the product shell. The client zone is where sensitive
+        data and inference live. HTTPS connects them; raw warehouse rows do not leave the client zone
+        unless explicitly approved.
+      </p>
+
+      <div class="arch-card">
+        <div class="arch-card-header">
+          <h3>Option 4 — Hybrid Enterprise (recommended production path)</h3>
+          <p>Evolution of today’s on-prem gateway into a processing agent behind the cloud platform.</p>
+        </div>
+
+        <div class="diagram">┌──────────────────────────────────────────────────────────────────────────┐
+│  <span class="azure">AZURE</span>  Prelytical-hosted or client Azure subscription                         │
+│                                                                          │
+│   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────────┐  │
+│   │ Angular UI      │───►│ Platform API    │───►│ Postgres / app state│  │
+│   │ Brief Studio    │    │ Users, domains  │    │ Brief history, audit│  │
+│   │ Governance UX   │    │ Workspaces      │    │ UX metadata         │  │
+│   └─────────────────┘    └────────┬────────┘    └─────────────────────┘  │
+│                                     │                                      │
+│                    <span class="dim">Optional: GPT for non-sensitive polish only</span>              │
+└─────────────────────────────────────┼──────────────────────────────────────┘
+                                      │  HTTPS — control plane
+                                      │  brief requests, business context,
+                                      │  exported HTML, readiness scores
+                                      ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│  <span class="client">CLIENT ENVIRONMENT</span>  On-prem datacenter or private VPC / VNet               │
+│                                                                          │
+│   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────────┐  │
+│   │ SQL Server      │◄───│ Processing      │───►│ GPU VM              │  │
+│   │ Curated ai views│    │ Agent / Gateway │    │ Ollama :11434       │  │
+│   │ Read-only login │    │ Guardrails      │    │ qwen2.5-coder:7b+   │  │
+│   └─────────────────┘    └─────────────────┘    └─────────────────────┘  │
+│                                                                          │
+│   <span class="highlight">Schema metadata, questions, and query rows stay here for inference</span>          │
+└──────────────────────────────────────────────────────────────────────────┘</div>
+
+        <div class="zone-grid">
+          <div class="zone-block azure">
+            <div class="zone-label azure"><span class="zone-dot azure"></span> Azure — product layer</div>
+            <ul>
+              <li>Executive UI and Brief Studio</li>
+              <li>Workspaces, users, domains, governance settings</li>
+              <li>Brief run history and export delivery</li>
+              <li>SaaS updates without touching client SQL</li>
+              <li>Optional cloud models for approved non-PII flows only</li>
+            </ul>
+          </div>
+          <div class="zone-block client">
+            <div class="zone-label client"><span class="zone-dot client"></span> Client — data &amp; inference</div>
+            <ul>
+              <li>SQL Server (source of truth)</li>
+              <li>Read-only SQL execution and guardrails</li>
+              <li>GPU VM with Ollama (private network only)</li>
+              <li>Schema-first brief generation and Ask</li>
+              <li>Local audit log for SQL and model events</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="connector-bar">
+          <strong>Connector:</strong> Platform API calls the on-prem processing agent over HTTPS (outbound from client, or site-to-site VPN / private link). Agent never exposes SQL credentials to Azure.
+        </div>
+      </div>
+
+      <div class="callout">
+        <p>
+          <strong>What this is not:</strong> Putting the GPU in Prelytical’s public cloud and pulling SQL over the internet.
+          That rarely passes security review. The GPU belongs in the <em>client’s</em> network, reachable from the processing agent — same pattern as Option 2 today.
+        </p>
+      </div>
+    </section>
+
+    <!-- What runs where -->
+    <section id="components">
+      <h2>What runs where</h2>
+      <p class="section-lead">Clear ownership for sales, security review, and client IT.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Location</th>
+              <th>Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Angular UI, Brief Studio</td>
+              <td><span class="pill azure">Azure</span></td>
+              <td>Modern SaaS experience, continuous delivery</td>
+            </tr>
+            <tr>
+              <td>Platform API, workspaces, users</td>
+              <td><span class="pill azure">Azure</span></td>
+              <td>Multi-tenant product shell and governance</td>
+            </tr>
+            <tr>
+              <td>Postgres / app metadata</td>
+              <td><span class="pill azure">Azure</span></td>
+              <td>Brief runs, domains, non-warehouse app state</td>
+            </tr>
+            <tr>
+              <td>SQL Server warehouse</td>
+              <td><span class="pill client">Client</span></td>
+              <td>Data never leaves client DB boundary</td>
+            </tr>
+            <tr>
+              <td>Processing agent (today’s gateway, headless)</td>
+              <td><span class="pill client">Client</span></td>
+              <td>Guardrails, SQL execution, model orchestration</td>
+            </tr>
+            <tr>
+              <td>GPU + Ollama inference</td>
+              <td><span class="pill client">Client</span></td>
+              <td>Fast, private LLM — no OpenAI egress</td>
+            </tr>
+            <tr>
+              <td>Curated <code>ai</code> views</td>
+              <td><span class="pill client">Client</span></td>
+              <td>Privacy, quality, and governance at source</td>
+            </tr>
+            <tr>
+              <td>Azure OpenAI / M365 Copilot</td>
+              <td><span class="pill both">If approved</span></td>
+              <td>Not the default path — see alternatives below</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- POC to enterprise -->
+    <section id="evolution">
+      <h2>From today’s gateway to enterprise hybrid</h2>
+      <p class="section-lead">The gateway is the POC stepping stone; the platform is the product destination.</p>
+
+      <div class="timeline">
+        <div class="timeline-card current">
+          <div class="timeline-step">Today — POC</div>
+          <h3>Secure SQL Gateway</h3>
+          <p>Single Windows VM: static UI, FastAPI, SQL Server, Ollama (CPU or remote GPU).</p>
+          <ul>
+            <li>Proves read-only SQL and guardrails</li>
+            <li>Executive brief tab (core product)</li>
+            <li>Option 1 demo / Option 2 production GPU</li>
+          </ul>
+        </div>
+        <div class="timeline-card target">
+          <div class="timeline-step">Enterprise target</div>
+          <h3>Platform + processing agent</h3>
+          <p>Cloud UI replaces gateway chrome; gateway becomes a headless agent on the client network.</p>
+          <ul>
+            <li>Azure hosts Angular + platform API</li>
+            <li>Agent handles SQL, briefs, Ask locally</li>
+            <li>GPU VM unchanged (Option 2 wiring)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Two gates -->
+    <section id="gates">
+      <h2>Two gating decisions</h2>
+      <p class="section-lead">Everything else is execution once these are settled with client IT and security.</p>
+
+      <div class="decision-grid">
+        <div class="decision-card gate">
+          <h3>1. Inference path — GPU on client network</h3>
+          <p>For production executive use, CPU-only inference is too slow. Plan a private GPU VM:</p>
+          <ul>
+            <li>AWS <code>g4dn.xlarge</code> or Azure NC-series (~$400/mo on-demand)</li>
+            <li>Ollama on private IP; port 11434 restricted to agent VM</li>
+            <li>Models: <code>qwen2.5-coder:7b</code> default; 14b+ for quality on same GPU tier</li>
+          </ul>
+        </div>
+        <div class="decision-card gate">
+          <h3>2. Privacy boundary — what may reach the model</h3>
+          <p>Security and legal must sign off on prompt content in the client zone:</p>
+          <ul>
+            <li>Schema metadata (table/column names)</li>
+            <li>Query result rows for Ask summarization (capped)</li>
+            <li>Brief context derived from live warehouse shape</li>
+            <li>What may sync back to Azure (scores, HTML exports vs raw schema)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Privacy matrix -->
+    <section id="privacy">
+      <h2>Data crossing the boundary</h2>
+      <p class="section-lead">Use this table in security reviews. Default posture: inference stays client-side; Azure gets product metadata and deliverables.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Data type</th>
+              <th>Stays on client</th>
+              <th>May go to Azure</th>
+              <th>Typical approval</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Raw warehouse rows</td>
+              <td class="cell-yes">Yes</td>
+              <td class="cell-no">No</td>
+              <td>Always client-only</td>
+            </tr>
+            <tr>
+              <td>SQL credentials</td>
+              <td class="cell-yes">Yes</td>
+              <td class="cell-no">No</td>
+              <td>Always client-only</td>
+            </tr>
+            <tr>
+              <td>Schema metadata for inference</td>
+              <td class="cell-yes">Yes (GPU VM)</td>
+              <td class="cell-mid">Optional sync</td>
+              <td>Security review</td>
+            </tr>
+            <tr>
+              <td>Business context (user-entered)</td>
+              <td class="cell-mid">Generated on client</td>
+              <td class="cell-yes">Often yes</td>
+              <td>Usually OK</td>
+            </tr>
+            <tr>
+              <td>Finished brief HTML / scores</td>
+              <td class="cell-mid">Copy on client</td>
+              <td class="cell-yes">Yes</td>
+              <td>Product feature</td>
+            </tr>
+            <tr>
+              <td>Query results to cloud LLM</td>
+              <td class="cell-no">—</td>
+              <td class="cell-mid">Azure OpenAI only</td>
+              <td>Explicit exception path</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Request flow -->
+    <section id="flow">
+      <h2>Executive brief request flow</h2>
+      <p class="section-lead">User experience lives in Azure; intelligence for SQL and inference stays on the client network.</p>
+
+      <div class="flow-box">
+        <div class="flow-steps">
+          <div class="flow-step azure">User in Brief Studio</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step azure">Platform API</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step client">Processing agent</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step client">Schema from SQL</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step client">GPU / Ollama</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step accent">Brief HTML</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step azure">Display &amp; export</div>
+        </div>
+        <p class="flow-caption">
+          Ask (SQL Q&amp;A) follows the same split: UI in Azure, SQL generation and execution on the client agent + GPU.
+        </p>
+      </div>
+    </section>
+
+    <!-- Model quality -->
+    <section id="models">
+      <h2>Is Ollama good enough?</h2>
+      <p class="section-lead">Yes for on-prem enterprise — with eyes open about the quality ceiling vs cloud GPT.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Workload</th>
+              <th>Ollama (7B–14B on GPU)</th>
+              <th>GPT-class (platform cloud)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Guarded SQL Ask on <code>ai</code> views</td>
+              <td class="cell-yes">Good enough</td>
+              <td class="cell-yes">Better on messy schemas</td>
+            </tr>
+            <tr>
+              <td>Schema-first executive brief</td>
+              <td class="cell-mid">Solid with server-side renderer</td>
+              <td class="cell-yes">Richer nuance and prose</td>
+            </tr>
+            <tr>
+              <td>Brief + deep business context</td>
+              <td class="cell-mid">Thinner without rich input</td>
+              <td class="cell-yes">Strongest</td>
+            </tr>
+            <tr>
+              <td>Data privacy</td>
+              <td class="cell-yes">Best — stays on client</td>
+              <td class="cell-mid">Requires explicit approval</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <p>
+          <strong>Quality dial without leaving the client:</strong> larger Ollama models on the same GPU
+          (<code>qwen2.5-coder:14b</code>), richer <code>ai</code> views, and business context in the brief form.
+          The gap vs GPT is real but manageable for schema-first planning — not row-level magic.
+        </p>
+      </div>
+    </section>
+
+    <!-- Alternatives -->
+    <section id="alternatives">
+      <h2>When the client asks about Copilot / Azure OpenAI</h2>
+      <p class="section-lead">M365 Copilot is not a plug-in API for Prelytical. Azure OpenAI is the realistic cloud alternative — with a different privacy trade.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Approach</th>
+              <th>Speed</th>
+              <th>Privacy</th>
+              <th>When to use</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Hybrid (this doc)</strong><br />Azure UI + client GPU</td>
+              <td class="cell-yes">Seconds</td>
+              <td class="cell-yes">Strongest</td>
+              <td>Default enterprise path</td>
+            </tr>
+            <tr>
+              <td>Gateway only (Options 1 &amp; 2)</td>
+              <td class="cell-mid">Seconds on GPU</td>
+              <td class="cell-yes">Strongest</td>
+              <td>POC, air-gap, no SaaS yet</td>
+            </tr>
+            <tr>
+              <td>Azure OpenAI for inference</td>
+              <td class="cell-yes">Seconds</td>
+              <td class="cell-mid">Tenant-bound but data egress</td>
+              <td>Only if security explicitly approves</td>
+            </tr>
+            <tr>
+              <td>M365 Copilot seats</td>
+              <td class="cell-no">N/A</td>
+              <td class="cell-no">Not integratable</td>
+              <td>Separate product; not backend for Prelytical</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <p>
+          <strong>Copilot clarification:</strong> “We have Copilot in our Azure tenant” usually means M365 Copilot
+          and/or Azure OpenAI. Only Azure OpenAI can power a custom backend — and it sends schema and query context
+          off the SQL VM into Azure. That is an explicit policy choice, not the default hybrid design.
+        </p>
+      </div>
+    </section>
+
+    <!-- Cost -->
+    <section id="cost">
+      <h2>Typical client infrastructure cost</h2>
+      <p class="section-lead">Prelytical SaaS licensing is separate. These are ballpark client-owned infra numbers.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>~Monthly (on-demand)</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>GPU inference VM (T4 class)</td>
+              <td>~$390–400</td>
+              <td>AWS g4dn.xlarge / Azure NC-series</td>
+            </tr>
+            <tr>
+              <td>SQL + processing agent VM</td>
+              <td>~$120–300</td>
+              <td>Size depends on SQL workload</td>
+            </tr>
+            <tr>
+              <td>Demo-only GPU (business hours)</td>
+              <td>~$100</td>
+              <td>Stop VM when not in use</td>
+            </tr>
+            <tr>
+              <td>1-year reserved GPU</td>
+              <td>~$165–240</td>
+              <td>Steady production discount</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Checklist -->
+    <section id="checklist">
+      <h2>Enterprise readiness checklist</h2>
+      <p class="section-lead">For client IT, security, and Prelytical deployment planning.</p>
+
+      <div class="checklist">
+        <ul>
+          <li>Security approves schema/metadata in on-prem model prompts</li>
+          <li>GPU VM provisioned in client VPC with private IP only</li>
+          <li>Firewall: 11434 open from agent VM → GPU VM only</li>
+          <li>Read-only SQL login on curated <code>ai</code> views</li>
+          <li>Processing agent deployed (gateway or headless v2)</li>
+          <li>Platform tenant wired to agent endpoint (HTTPS / VPN)</li>
+          <li>Ollama model pulled and warmed (<code>qwen2.5-coder:7b</code>+)</li>
+          <li>Audit retention and VM patching ownership defined</li>
+          <li>Agreement on what brief artifacts sync to Azure</li>
+          <li>POC completed on Option 1 or 2 before hybrid cutover</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Pitch -->
+    <section id="pitch">
+      <h2>Client-facing summary</h2>
+      <div class="pitch-box">
+        <blockquote>
+          “Prelytical gives your executives a modern brief studio in Azure. Your warehouse never opens up to
+          public AI — SQL stays read-only on your network, and inference runs on your private GPU with Ollama.
+          You get SaaS velocity with on-prem data discipline.”
+        </blockquote>
+        <cite>Prelytical Enterprise Architecture · Hybrid Option 4</cite>
+      </div>
+    </section>
+
+  </div>
+
+  <footer>
+    <p>
+      Prelytical &middot;
+      <a href="ARCHITECTURE_OPTIONS.html">Architecture Options (POC)</a>
+      &middot;
+      <a href="GPU_INFERENCE_VM.md">GPU Inference VM Guide</a>
+      &middot;
+      <a href="https://github.com/Prelytical-AI/gateway">github.com/Prelytical-AI/gateway</a>
+    </p>
+  </footer>
+
+</body>
+</html>

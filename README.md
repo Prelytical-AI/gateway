@@ -76,6 +76,10 @@ SQLSERVER_BLOCKED_SCHEMAS=sys,INFORMATION_SCHEMA
 GUARDRAILS_BLOCK_PII_COLUMNS=false
 ```
 
+**ODBC Driver 17:** set `SQLSERVER_DRIVER=ODBC Driver 17 for SQL Server` and often `SQLSERVER_ENCRYPT=no` for local SQL Server. See [Troubleshooting](docs/TROUBLESHOOTING.md).
+
+**Brief schema limits:** `BRIEF_MAX_TABLES_WITH_COLUMNS`, `BRIEF_MAX_COLUMNS_PER_TABLE`, `BRIEF_MAX_TABLE_INVENTORY`, `BRIEF_MAX_ENTITIES` (defaults in `.env.example`). Ask uses `MODEL_MAX_SCHEMA_OBJECTS`.
+
 Use your real database name and the same password as in `01_create_readonly_login.sql`.
 
 ### Start and verify

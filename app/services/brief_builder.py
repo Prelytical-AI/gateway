@@ -4,11 +4,9 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "brief-master-directive.md"
+from app.core.config import Settings, settings as default_settings
 
-MAX_TABLES_WITH_COLUMNS = 18
-MAX_COLUMNS_PER_TABLE = 8
-MAX_TABLE_INVENTORY = 60
+PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "brief-master-directive.md"
 
 
 def load_brief_system_prompt() -> str:
@@ -21,8 +19,15 @@ def schema_metadata_to_artifact(
     schema_metadata: Dict[str, Any],
     *,
     database_name: str,
+    config: Optional[Settings] = None,
 ) -> Dict[str, Any]:
     """Turn live SQL Server schema metadata into platform-style source context."""
+    cfg = config or default_settings
+    max_tables = cfg.brief_max_tables_with_columns
+    max_columns = cfg.brief_max_columns_per_table
+    max_inventory = cfg.brief_max_table_inventory
+    max_entities = cfg.brief_max_entities
+
     tables: List[Dict[str, Any]] = []
     table_inventory: List[Dict[str, Any]] = []
 
@@ -39,7 +44,7 @@ def schema_metadata_to_artifact(
                     "column_count": len(columns),
                 }
             )
-            if len(tables) < MAX_TABLES_WITH_COLUMNS:
+            if len(tables) < max_tables:
                 tables.append(
                     {
                         "name": qualified,
@@ -47,7 +52,7 @@ def schema_metadata_to_artifact(
                         "column_count": len(columns),
                         "columns": [
                             {"name": c.get("name"), "type": c.get("type")}
-                            for c in columns[:MAX_COLUMNS_PER_TABLE]
+                            for c in columns[:max_columns]
                         ],
                     }
                 )
@@ -59,7 +64,7 @@ def schema_metadata_to_artifact(
             "estimated_fields": item["column_count"],
             "grain": "unknown — metadata-only review",
         }
-        for item in table_inventory[:40]
+        for item in table_inventory[:max_entities]
     ]
 
     shape = {
@@ -67,10 +72,10 @@ def schema_metadata_to_artifact(
             "table_count": total_tables,
             "entity_count": len(entities),
             "review_mode": "metadata_only",
-            "truncated_for_prompt": total_tables > MAX_TABLES_WITH_COLUMNS,
+            "truncated_for_prompt": total_tables > max_tables,
         },
         "entities": entities,
-        "table_inventory": table_inventory[:MAX_TABLE_INVENTORY],
+        "table_inventory": table_inventory[:max_inventory],
         "tables": tables,
         "joins": [],
         "common_terms": _infer_common_terms(table_inventory),
@@ -104,8 +109,14 @@ def build_brief_prompt(
     audience: str,
     schema_metadata: Dict[str, Any],
     database_name: str,
+    config: Optional[Settings] = None,
 ) -> tuple[str, str]:
-    artifact = schema_metadata_to_artifact(schema_metadata, database_name=database_name)
+    cfg = config or default_settings
+    artifact = schema_metadata_to_artifact(
+        schema_metadata,
+        database_name=database_name,
+        config=cfg,
+    )
     domains: List[Dict[str, Any]] = []
     if business_context and business_context.strip():
         domains.append(
