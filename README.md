@@ -184,6 +184,10 @@ python -m venv .venv
 
 - [GPU inference VM](docs/GPU_INFERENCE_VM.md) — Option 2: separate Linux GPU box + bootstrap script
 - [Architecture options](docs/ARCHITECTURE_OPTIONS.html) — same-VM vs split-VM vs cloud inference
+- [NSAW qualification guide](docs/NSAW_QUALIFICATION.html) — engagement types, personas, who says yes
+- [NSAW Phase 1 sprint](docs/NSAW_PHASE1_SPRINT.html) — metadata-only cloud sprint (Type A detail)
+- [NSAW engagement guide](docs/NSAW_ENGAGEMENT.html) — full NSAW architecture (all phases)
+- [Enterprise hybrid architecture](docs/ENTERPRISE_ARCHITECTURE.html) — Azure product + client GPU inference
 - [AWS test VM](docs/TEST_VM.md) — provision a Windows SQL Server EC2 for fresh install testing
 - [Same-VM POC guide](docs/SAME_VM_SQLSERVER_OLLAMA_POC.md) — full walkthrough
 - [Client demo script](docs/CLIENT_TEST_SCRIPT.md)

@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prelytical — Phase 1 NSAW Sprint (Metadata · Cloud · Human Review)</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --text: #0f2744;
+      --muted: #5b6b7f;
+      --border: #d8e0ea;
+      --primary: #0d9488;
+      --primary-light: #ccfbf1;
+      --primary-dark: #0b7a70;
+      --navy: #0f2744;
+      --navy-mid: #16365c;
+      --saas: #0078d4;
+      --saas-light: #e8f4fd;
+      --saas-dark: #005a9e;
+      --review: #b45309;
+      --review-light: #fffbeb;
+      --review-dark: #92400e;
+      --success: #067647;
+      --success-bg: #ecfdf3;
+      --danger: #b42318;
+      --danger-bg: #fef3f2;
+      --shadow: 0 8px 24px rgba(15, 39, 68, 0.08);
+      --shadow-lg: 0 16px 48px rgba(15, 39, 68, 0.12);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 50%, #1a4a6e 100%);
+      color: #fff;
+      padding: 3.25rem 2rem 3.75rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 85% 18%, rgba(0, 120, 212, 0.28) 0%, transparent 45%),
+        radial-gradient(circle at 10% 88%, rgba(13, 148, 136, 0.22) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    .hero-inner { max-width: 960px; margin: 0 auto; position: relative; }
+
+    .badge {
+      display: inline-block;
+      background: rgba(13, 148, 136, 0.25);
+      border: 1px solid rgba(13, 148, 136, 0.5);
+      color: #99f6e4;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    .hero h1 {
+      margin: 0 0 0.75rem;
+      font-size: clamp(1.65rem, 3.8vw, 2.35rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .hero p { margin: 0; max-width: 680px; font-size: 1.05rem; color: #c7d6ea; }
+
+    .hero-promise {
+      margin-top: 1.35rem;
+      padding: 1rem 1.2rem;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      font-size: 0.98rem;
+      color: #e2e8f0;
+      max-width: 680px;
+    }
+
+    .hero-promise strong { color: #7dd3fc; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 0 2rem 3.5rem; }
+    section { margin-top: 2.75rem; }
+
+    section > h2 {
+      font-size: 1.28rem;
+      font-weight: 700;
+      margin: 0 0 0.45rem;
+    }
+
+    section > .section-lead {
+      color: var(--muted);
+      margin: 0 0 1.5rem;
+      max-width: 680px;
+      font-size: 0.95rem;
+    }
+
+    .summary-card {
+      background: var(--surface);
+      border: 2px solid var(--primary);
+      border-radius: var(--radius);
+      padding: 1.75rem 2rem;
+      margin-top: -2rem;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      z-index: 1;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .summary-item strong {
+      display: block;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .summary-item span { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+
+    .diagram-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .diagram-card-header {
+      padding: 1.25rem 1.75rem;
+      background: #fafbfc;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .diagram-card-header h3 { margin: 0; font-size: 1.05rem; }
+    .diagram-card-header p { margin: 0.3rem 0 0; font-size: 0.88rem; color: var(--muted); }
+
+    .diagram {
+      padding: 1.75rem 2rem;
+      background: #f8fafc;
+      font-family: "Cascadia Code", "SF Mono", Consolas, monospace;
+      font-size: 0.78rem;
+      line-height: 1.55;
+      overflow-x: auto;
+      white-space: pre;
+      text-align: center;
+      color: #334155;
+    }
+
+    .diagram .saas { color: var(--saas-dark); font-weight: 600; }
+    .diagram .client { color: var(--review-dark); font-weight: 600; }
+    .diagram .review { color: var(--review-dark); font-weight: 600; }
+    .diagram .accent { color: var(--primary-dark); font-weight: 600; }
+    .diagram .dim { color: #94a3b8; }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 3rem 1fr;
+      gap: 0 1.25rem;
+      padding: 1.35rem 1.75rem;
+      border-bottom: 1px solid var(--border);
+      align-items: start;
+    }
+
+    .step:last-child { border-bottom: none; }
+
+    .step-num {
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 50%;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      font-weight: 700;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .step-num.review {
+      background: var(--review-light);
+      color: var(--review-dark);
+    }
+
+    .step-num.cloud {
+      background: var(--saas-light);
+      color: var(--saas-dark);
+    }
+
+    .step h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+    .step p { margin: 0; font-size: 0.9rem; color: var(--muted); }
+
+    .step-tag {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.45rem;
+      border-radius: 999px;
+      margin-bottom: 0.35rem;
+    }
+
+    .step-tag.client { background: var(--review-light); color: var(--review-dark); }
+    .step-tag.cloud { background: var(--saas-light); color: var(--saas-dark); }
+    .step-tag.both { background: var(--success-bg); color: var(--success); }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+
+    .box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.35rem 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    .box h3 {
+      margin: 0 0 0.65rem;
+      font-size: 0.95rem;
+    }
+
+    .box ul {
+      margin: 0;
+      padding-left: 1.15rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .box li { margin-bottom: 0.35rem; }
+
+    .box.yes { border-top: 3px solid var(--success); }
+    .box.no { border-top: 3px solid var(--danger); }
+
+    .policy {
+      background: var(--navy);
+      color: #e2e8f0;
+      border-radius: var(--radius);
+      padding: 1.35rem 1.5rem;
+      font-family: "Cascadia Code", "SF Mono", Consolas, monospace;
+      font-size: 0.8rem;
+      line-height: 1.65;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .policy .k { color: #99f6e4; }
+    .policy .v { color: #fcd34d; }
+    .policy .c { color: #64748b; }
+
+    .callout {
+      background: var(--review-light);
+      border: 1px solid rgba(180, 83, 9, 0.25);
+      border-radius: var(--radius);
+      padding: 1.15rem 1.35rem;
+      margin-top: 1.25rem;
+    }
+
+    .callout p { margin: 0; font-size: 0.9rem; color: var(--review-dark); }
+
+    .callout.teal {
+      background: var(--primary-light);
+      border-color: rgba(13, 148, 136, 0.3);
+    }
+
+    .callout.teal p { color: var(--primary-dark); }
+
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    thead { background: linear-gradient(135deg, var(--navy), var(--navy-mid)); color: #fff; }
+    th, td { padding: 0.8rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    tbody tr:last-child td { border-bottom: none; }
+    td:first-child { font-weight: 600; }
+
+    .pitch {
+      background: linear-gradient(135deg, #0f2744, #1a4a6e);
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 1.75rem 2rem;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .pitch blockquote {
+      margin: 0;
+      font-size: 1.08rem;
+      line-height: 1.55;
+      color: #e2e8f0;
+    }
+
+    .pitch cite {
+      display: block;
+      margin-top: 0.85rem;
+      font-size: 0.8rem;
+      font-style: normal;
+      color: #94a3b8;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1.75rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2.5rem;
+    }
+
+    footer a { color: var(--primary); text-decoration: none; }
+
+    code {
+      font-family: "Cascadia Code", "SF Mono", Consolas, monospace;
+      font-size: 0.86em;
+      background: #eef2f7;
+      padding: 0.1rem 0.32rem;
+      border-radius: 4px;
+    }
+
+    @media (max-width: 640px) {
+      .hero { padding: 2.25rem 1.25rem 2.75rem; }
+      .container { padding: 0 1.25rem 2.5rem; }
+      .summary-card { margin-top: -1.25rem; padding: 1.25rem; }
+      .two-col { grid-template-columns: 1fr; }
+      .diagram { font-size: 0.68rem; text-align: left; padding: 1.25rem; }
+    }
+
+    @media print {
+      .hero { padding: 1.25rem; }
+      .step { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="hero">
+    <div class="hero-inner">
+      <span class="badge">Phase 1 Only · NSAW Sprint</span>
+      <h1>Metadata in · Human review · Cloud processing</h1>
+      <p>
+        The default first engagement for NetSuite Analytics Warehouse clients:
+        no client VM, no row-level data, frontier model on Prelytical SaaS —
+        with explicit human approval before anything is processed.
+      </p>
+      <div class="hero-promise">
+        <strong>In one sentence:</strong> Client exports NSAW metadata → humans on both sides review →
+        Prelytical cloud generates the brief with an approved frontier model → consultant delivers after final review.
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <div class="summary-card">
+      <p style="margin:0;color:var(--muted);font-size:0.95rem;">
+        This document describes <strong>only Phase 1</strong>. It does not cover private GPU inference,
+        live ADW connections, or the on-prem SQL gateway. Those are later phases if the client needs them.
+      </p>
+      <div class="summary-grid">
+        <div class="summary-item"><strong>Where Prelytical runs</strong><span>Cloud SaaS</span></div>
+        <div class="summary-item"><strong>What crosses the boundary</strong><span>Metadata package only</span></div>
+        <div class="summary-item"><strong>Where AI runs</strong><span>Prelytical cloud (frontier model)</span></div>
+        <div class="summary-item"><strong>Human gate</strong><span>Before upload + before delivery</span></div>
+      </div>
+    </div>
+
+    <section id="architecture">
+      <h2>Architecture (Phase 1)</h2>
+      <p class="section-lead">Two zones: client exports and approves metadata; everything after upload happens in Prelytical cloud.</p>
+
+      <div class="diagram-card">
+        <div class="diagram-card-header">
+          <h3>Metadata-only sprint topology</h3>
+          <p>No persistent connection into NetSuite or ADW required for the pilot</p>
+        </div>
+        <div class="diagram">  <span class="client">CLIENT</span>
+  ┌─────────────────────────────────────────┐
+  │  NSAW / ADW (their Oracle cloud)         │
+  │       │                                  │
+  │       ▼                                  │
+  │  Metadata export / connector             │
+  │  (schemas, tables, columns, keys —       │
+  │   <span class="accent">NO transaction rows</span>)                │
+  │       │                                  │
+  │       ▼                                  │
+  │  <span class="review">◆ CLIENT HUMAN REVIEW</span>                 │
+  │  Inspect package · approve upload        │
+  └──────────────────┬──────────────────────┘
+                     │  HTTPS · approved package
+                     │  + business context (typed in)
+                     ▼
+  <span class="saas">PRELYTICAL CLOUD (SaaS)</span>
+  ┌─────────────────────────────────────────┐
+  │  Platform · domain · source · brief      │
+  │       │                                  │
+  │       ▼                                  │
+  │  <span class="review">◆ PRELYTICAL HUMAN REVIEW</span>             │
+  │  Confirm policy · approve generation     │
+  │       │                                  │
+  │       ▼                                  │
+  │  Frontier model (OpenAI / Azure OpenAI)  │
+  │  Metadata-only prompt · audit logged       │
+  │       │                                  │
+  │       ▼                                  │
+  │  <span class="review">◆ CONSULTANT FINAL REVIEW</span>            │
+  │  Edit · strengthen · client delivery     │
+  └─────────────────────────────────────────┘</div>
+      </div>
+    </section>
+
+    <section id="flow">
+      <h2>Step-by-step flow</h2>
+      <p class="section-lead">Every step is designed to be explainable in a security conversation.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div>
+            <span class="step-tag client">Client</span>
+            <h3>Create domain &amp; business context</h3>
+            <p>CFO goals, pain points, metrics, audience — entered in Prelytical or collected in a kickoff worksheet. No warehouse access needed yet.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div>
+            <span class="step-tag client">Client</span>
+            <h3>Export NSAW metadata package</h3>
+            <p>DBA or implementation partner pulls catalog from ADW / NSAW semantic model: table names, columns, types, keys, relationships, row counts. Mode A — metadata only.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num review">3</div>
+          <div>
+            <span class="step-tag both">Human gate</span>
+            <h3>Client reviews package before upload</h3>
+            <p>Client opens JSON/CSV export and confirms: no sample rows, no PII values, no transaction detail. They sign off or redact before sending.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div>
+            <span class="step-tag cloud">Prelytical cloud</span>
+            <h3>Upload source to platform</h3>
+            <p>Package ingested as a source artifact. Stored in Prelytical workspace — not merged into a shared data lake of client transactions.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num review">5</div>
+          <div>
+            <span class="step-tag both">Human gate</span>
+            <h3>Prelytical confirms run policy</h3>
+            <p>Consultant verifies: <code>metadata_only</code>, <code>row_level_data=false</code>, approved model, correct domain context. Generation does not start until this is explicit.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num cloud">6</div>
+          <div>
+            <span class="step-tag cloud">Prelytical cloud</span>
+            <h3>Generate in cloud with frontier model</h3>
+            <p>Shape map → ranked opportunities → executive brief HTML. All inference on Prelytical infrastructure. Audit record captures exactly what metadata fields were sent.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num review">7</div>
+          <div>
+            <span class="step-tag both">Human gate</span>
+            <h3>Consultant final review &amp; delivery</h3>
+            <p>Founder/consultant edits for accuracy, tone, and client context. Client receives polished HTML/PDF — not raw model output.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <p>
+          <strong>Three human checkpoints:</strong> (1) client approves metadata package,
+          (2) Prelytical confirms policy before generation, (3) consultant approves before client delivery.
+          AI never runs on unreviewed row-level data because row-level data is never in scope.
+        </p>
+      </div>
+    </section>
+
+    <section id="boundary">
+      <h2>What crosses the line — and what does not</h2>
+      <div class="two-col">
+        <div class="box yes">
+          <h3>Included (with review)</h3>
+          <ul>
+            <li>Schema and table names</li>
+            <li>Column names and data types</li>
+            <li>Primary / foreign keys</li>
+            <li>Row counts (aggregate)</li>
+            <li>Business context (client-authored)</li>
+            <li>Finished brief HTML (outbound deliverable)</li>
+          </ul>
+        </div>
+        <div class="box no">
+          <h3>Excluded — always in Phase 1</h3>
+          <ul>
+            <li>NetSuite transaction rows</li>
+            <li>Invoice / payment / employee detail</li>
+            <li>Sample values from sensitive columns</li>
+            <li>Live query results from ADW</li>
+            <li>Credentials to NetSuite or ADW</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="policy">
+      <h2>Run policy (locked for Phase 1)</h2>
+      <p class="section-lead">Every brief run uses this policy. No exceptions in the sprint.</p>
+
+      <div class="policy">
+        <span class="c">// Phase 1 — metadata-only cloud processing</span><br /><br />
+        {<br />
+        &nbsp;&nbsp;<span class="k">"phase"</span>: <span class="v">"1_metadata_sprint"</span>,<br />
+        &nbsp;&nbsp;<span class="k">"model_policy"</span>: <span class="v">"metadata_only_cloud"</span>,<br />
+        &nbsp;&nbsp;<span class="k">"model_provider"</span>: <span class="v">"approved_frontier"</span>,<br />
+        &nbsp;&nbsp;<span class="k">"row_level_data_allowed"</span>: <span class="v">false</span>,<br />
+        &nbsp;&nbsp;<span class="k">"sample_values_allowed"</span>: <span class="v">false</span>,<br />
+        &nbsp;&nbsp;<span class="k">"client_package_review_required"</span>: <span class="v">true</span>,<br />
+        &nbsp;&nbsp;<span class="k">"pre_generation_review_required"</span>: <span class="v">true</span>,<br />
+        &nbsp;&nbsp;<span class="k">"consultant_delivery_review_required"</span>: <span class="v">true</span>,<br />
+        &nbsp;&nbsp;<span class="k">"audit_log"</span>: <span class="v">true</span><br />
+        }
+      </div>
+    </section>
+
+    <section id="deliverables">
+      <h2>Sprint deliverables (~2 weeks)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Artifact</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Data shape map</td>
+              <td>Entities, relationships, coverage — what NSAW can support analytically</td>
+            </tr>
+            <tr>
+              <td>Opportunity backlog</td>
+              <td>Ranked analysis ideas with readiness, value, and privacy notes</td>
+            </tr>
+            <tr>
+              <td>Executive brief</td>
+              <td>Standalone HTML — readiness scores, opportunities, risks, next steps</td>
+            </tr>
+            <tr>
+              <td>Deep-dive plan</td>
+              <td>What to validate next if client moves to row-level analysis later</td>
+            </tr>
+            <tr>
+              <td>Audit summary</td>
+              <td>What metadata was used, which model, confirmation no rows were included</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="not-this">
+      <h2>Explicitly not Phase 1</h2>
+      <p class="section-lead">If the client asks for these, that is a different phase or a different product path.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Request</th>
+              <th>Phase 1 answer</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Install gateway on our server</td>
+              <td>Not needed — metadata package upload instead</td>
+            </tr>
+            <tr>
+              <td>Connect live to our ADW</td>
+              <td>Phase 2 — still metadata-only by default</td>
+            </tr>
+            <tr>
+              <td>Run AI inside our network</td>
+              <td>Phase 3 — private GPU in their tenancy</td>
+            </tr>
+            <tr>
+              <td>Ask questions against live data</td>
+              <td>Out of scope — planning brief, not BI chat</td>
+            </tr>
+            <tr>
+              <td>Use our M365 Copilot</td>
+              <td>Not integratable — Prelytical uses approved API model</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout teal">
+        <p>
+          <strong>Not a “NetSuite gateway” install.</strong> Phase 1 is export → review → upload.
+          The on-prem SQL gateway in the repo is a separate path for SQL Server clients.
+        </p>
+      </div>
+    </section>
+
+    <section id="pitch">
+      <h2>Client-facing summary</h2>
+      <div class="pitch">
+        <blockquote>
+          “We run Prelytical in the cloud. You export a metadata-only snapshot of your NSAW model,
+          review it, and upload it. We never touch your transactions. After human approval on both sides,
+          we generate your executive brief using our secure cloud AI — and you get a consultant-reviewed
+          deliverable in about two weeks.”
+        </blockquote>
+        <cite>Prelytical Phase 1 · NSAW Metadata Sprint</cite>
+      </div>
+    </section>
+
+  </div>
+
+  <footer>
+    <p>
+      Prelytical &middot;
+      <a href="NSAW_QUALIFICATION.html">Engagement types &amp; personas</a>
+      &middot;
+      <a href="NSAW_ENGAGEMENT.html">Full NSAW guide (all phases)</a>
+      &middot;
+      <a href="ENTERPRISE_ARCHITECTURE.html">Enterprise hybrid</a>
+    </p>
+  </footer>
+
+</body>
+</html>

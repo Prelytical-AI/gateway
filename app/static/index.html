@@ -7,136 +7,117 @@
   <link rel="icon" type="image/png" href="/static/assets/prelytical-icon.png" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body>
+<body class="chat-layout">
   <header class="app-header">
     <div class="header-brand">
       <img class="brand-logo" src="/static/assets/prelytical-logo.png" alt="Prelytical" />
       <div class="header-title">
         <h1>Secure SQL Gateway</h1>
-        <p class="subtitle">Executive briefs + read-only SQL analytics (on-prem)</p>
+        <p class="subtitle">Tell Prelytical what you need — briefs, investigations, SQL answers</p>
       </div>
     </div>
     <div class="header-actions">
-      <button id="refresh-status-btn" class="btn secondary">Refresh Status</button>
+      <button id="chat-clear-btn" class="btn secondary" type="button">New chat</button>
+      <button id="refresh-status-btn" class="btn secondary">Status</button>
     </div>
   </header>
 
-  <main class="container">
-    <section class="status-grid" id="status-cards">
+  <main class="chat-main">
+    <section class="status-grid status-compact" id="status-cards">
       <article class="status-card" id="status-sql">
-        <h3>SQL Server</h3>
-        <p class="status-value">Checking…</p>
+        <h3>SQL</h3>
+        <p class="status-value">…</p>
       </article>
       <article class="status-card" id="status-model">
         <h3>Model</h3>
-        <p class="status-value">Checking…</p>
+        <p class="status-value">…</p>
       </article>
       <article class="status-card" id="status-schemas">
-        <h3>Allowed Schemas</h3>
+        <h3>Schemas</h3>
         <p class="status-value">—</p>
       </article>
       <article class="status-card" id="status-rows">
-        <h3>Max Rows</h3>
+        <h3>Max rows</h3>
         <p class="status-value">—</p>
       </article>
     </section>
 
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="brief">Executive Brief</button>
-      <button class="tab" data-tab="ask">Ask a Question</button>
-      <button class="tab" data-tab="schema">Schema</button>
-      <button class="tab" data-tab="validator">SQL Validator</button>
-      <button class="tab" data-tab="audit">Audit Log</button>
-      <button class="tab" data-tab="setup">Setup Checklist</button>
+      <button class="tab active" data-tab="chat">Chat</button>
+      <button class="tab" data-tab="tools">Tools</button>
     </nav>
 
-    <section class="panel active" id="panel-brief">
-      <label for="brief-title">Brief title</label>
-      <input id="brief-title" type="text" value="Executive Data Readiness Brief" />
-      <label for="brief-objective">Objective</label>
-      <textarea id="brief-objective" rows="3">Assess what this database is well positioned to answer for executives — data shape, readiness, top opportunities, and validation steps.</textarea>
-      <label for="brief-context">Business context (optional)</label>
-      <textarea id="brief-context" rows="3" placeholder="Industry, goals, key metrics, privacy constraints…"></textarea>
-      <label for="brief-audience">Audience</label>
-      <input id="brief-audience" type="text" value="Executives and analytics leaders" />
-      <p class="hint ask-hint">
-        This is the core Prelytical workflow: schema-first executive brief with HTML report.
-        Uses connected SQL metadata only (no row-level data). On CPU, generation can take 10–20+ minutes — keep this tab open.
-      </p>
-      <button id="brief-btn" class="btn primary">Generate Executive Brief</button>
-      <p id="brief-progress" class="hint ask-progress hidden" aria-live="polite"></p>
-      <div id="brief-result" class="result-block hidden">
-        <div class="brief-score-row">
-          <div class="brief-score-card"><span>Readiness</span><strong id="brief-readiness">—</strong></div>
-          <div class="brief-score-card"><span>Confidence</span><strong id="brief-confidence">—</strong></div>
+    <section class="panel active chat-panel" id="panel-chat">
+      <div id="chat-messages" class="chat-messages" aria-live="polite">
+        <div class="chat-welcome">
+          <p>Ask anything about your connected database. Examples:</p>
+          <ul>
+            <li>Generate the executive data readiness brief</li>
+            <li>Look at item 2 from the brief — check the indicators and actually run it</li>
+            <li>The client asks about regional revenue — find where that lives in the data</li>
+            <li>Which region has the highest revenue?</li>
+          </ul>
+          <p class="hint">Attach a brief HTML/JSON file anytime. Conversation is remembered in this session.</p>
         </div>
-        <h3>Executive summary</h3>
-        <p id="brief-summary"></p>
-        <div class="button-row">
-          <button id="brief-download-btn" class="btn secondary" type="button">Download HTML</button>
+      </div>
+
+      <div id="chat-pending" class="chat-pending hidden">
+        <span class="chat-spinner"></span>
+        <span id="chat-pending-text">Working…</span>
+      </div>
+
+      <form id="chat-form" class="chat-composer">
+        <div id="chat-attachments" class="chat-attachments hidden"></div>
+        <div class="chat-input-row">
+          <label class="chat-attach-btn" title="Attach brief HTML or JSON">
+            <input id="chat-file-input" type="file" accept=".html,.htm,.json,text/html,application/json" multiple hidden />
+            📎
+          </label>
+          <textarea id="chat-input" rows="2" placeholder="Tell Prelytical what to do…" aria-label="Message"></textarea>
+          <button type="submit" id="chat-send-btn" class="btn primary">Send</button>
         </div>
-        <p id="brief-export-notice" class="hint brief-export-notice hidden"></p>
-        <h3>Report preview</h3>
-        <iframe id="brief-frame" class="brief-frame" title="Executive brief HTML report" sandbox=""></iframe>
+      </form>
+    </section>
+
+    <section class="panel" id="panel-tools">
+      <div class="tools-grid">
+        <div class="tool-block">
+          <h3>Schema</h3>
+          <button id="load-schema-btn" class="btn secondary">Load schema</button>
+          <div id="schema-content" class="schema-content"></div>
+        </div>
+        <div class="tool-block">
+          <h3>SQL validator</h3>
+          <textarea id="sql-input" rows="4" placeholder="SELECT TOP 10 * FROM ai.vw_demo_sales_summary"></textarea>
+          <div class="button-row">
+            <button id="validate-btn" class="btn secondary">Validate</button>
+            <button id="execute-btn" class="btn primary">Execute</button>
+          </div>
+          <div id="validator-result" class="result-block hidden">
+            <pre id="validator-normalized" class="code-block"></pre>
+            <p id="validator-message" class="validation"></p>
+            <div class="table-wrap"><table id="validator-table"></table></div>
+          </div>
+        </div>
+        <div class="tool-block">
+          <h3>Audit log</h3>
+          <button id="load-audit-btn" class="btn secondary">Load recent events</button>
+          <div id="audit-content" class="audit-content"></div>
+        </div>
+        <div class="tool-block">
+          <h3>Setup checklist</h3>
+          <ul class="checklist" id="setup-checklist">
+            <li data-check="sql"><span class="box"></span> SQL Server reachable</li>
+            <li data-check="login"><span class="box"></span> Read-only login configured</li>
+            <li data-check="schema"><span class="box"></span> Allowed schema objects readable</li>
+            <li data-check="ollama"><span class="box"></span> Ollama installed</li>
+            <li data-check="model"><span class="box"></span> Default model pulled</li>
+            <li data-check="app"><span class="box"></span> Gateway running</li>
+            <li data-check="brief"><span class="box"></span> Brief or investigation completed</li>
+            <li data-check="guardrails"><span class="box"></span> Unsafe SQL blocked</li>
+          </ul>
+        </div>
       </div>
-    </section>
-
-    <section class="panel" id="panel-ask">
-      <label for="question-input">Business question</label>
-      <textarea id="question-input" rows="4" placeholder="Which region has the highest revenue?"></textarea>
-      <p id="ask-hint" class="hint ask-hint">
-        Follow-on capability: run a read-only SQL query from a specific question.
-        On a CPU-only VM this can take several minutes — use Executive Brief for shape/readiness first.
-      </p>
-      <button id="ask-btn" class="btn primary">Ask Prelytical</button>
-      <p id="ask-progress" class="hint ask-progress hidden" aria-live="polite"></p>
-      <div id="ask-result" class="result-block hidden">
-        <h3>Generated SQL</h3>
-        <pre id="ask-sql" class="code-block"></pre>
-        <p id="ask-validation" class="validation"></p>
-        <h3>Answer</h3>
-        <p id="ask-answer"></p>
-        <h3>Rows</h3>
-        <div class="table-wrap"><table id="ask-table"></table></div>
-      </div>
-    </section>
-
-    <section class="panel" id="panel-schema">
-      <button id="load-schema-btn" class="btn secondary">Load Schema</button>
-      <div id="schema-content" class="schema-content"></div>
-    </section>
-
-    <section class="panel" id="panel-validator">
-      <label for="sql-input">SQL to validate or execute</label>
-      <textarea id="sql-input" rows="6" placeholder="SELECT TOP 10 * FROM ai.vw_demo_sales_summary"></textarea>
-      <div class="button-row">
-        <button id="validate-btn" class="btn secondary">Validate</button>
-        <button id="execute-btn" class="btn primary">Validate &amp; Execute</button>
-      </div>
-      <div id="validator-result" class="result-block hidden">
-        <pre id="validator-normalized" class="code-block"></pre>
-        <p id="validator-message" class="validation"></p>
-        <div class="table-wrap"><table id="validator-table"></table></div>
-      </div>
-    </section>
-
-    <section class="panel" id="panel-audit">
-      <button id="load-audit-btn" class="btn secondary">Load Recent Audit Events</button>
-      <div id="audit-content" class="audit-content"></div>
-    </section>
-
-    <section class="panel" id="panel-setup">
-      <ul class="checklist" id="setup-checklist">
-        <li data-check="sql"><span class="box"></span> SQL Server reachable</li>
-        <li data-check="login"><span class="box"></span> Read-only login configured</li>
-        <li data-check="schema"><span class="box"></span> Allowed schema objects readable</li>
-        <li data-check="ollama"><span class="box"></span> Ollama installed</li>
-        <li data-check="model"><span class="box"></span> Default model pulled</li>
-        <li data-check="app"><span class="box"></span> Prelytical running on localhost:8080</li>
-        <li data-check="brief"><span class="box"></span> Executive brief generated</li>
-        <li data-check="guardrails"><span class="box"></span> Unsafe SQL blocked</li>
-      </ul>
-      <p class="hint">Use the install scripts in <code>install/</code> and SQL scripts in <code>sql/</code> to complete setup.</p>
     </section>
   </main>
 

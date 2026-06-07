@@ -1,0 +1,278 @@
+from __future__ import annotations
+
+import html
+import re
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
+
+
+def render_investigation_html(
+    *,
+    title: str,
+    database_name: str,
+    user_question: str,
+    mode: str,
+    synthesis: Dict[str, Any],
+    steps: List[Dict[str, Any]],
+    brief_title: str = "",
+    opportunity: Optional[Dict[str, Any]] = None,
+) -> str:
+    generated = datetime.now(timezone.utc).strftime("%B %d, %Y %H:%M UTC")
+    exec_summary = _esc(synthesis.get("executive_summary") or "")
+    findings = synthesis.get("key_findings") or []
+    findings_html = "".join(f"<li>{_esc(x)}</li>" for x in findings if x)
+    tables_used = synthesis.get("tables_used") or []
+    indicators = synthesis.get("indicators_validated") or []
+    caveats = synthesis.get("caveats") or []
+    next_steps = synthesis.get("recommended_next_steps") or []
+
+    opp_block = ""
+    if opportunity:
+        opp_block = f"""
+        <section class="card">
+          <h2>Brief opportunity</h2>
+          <p><strong>{_esc(opportunity.get("title") or "")}</strong></p>
+          <p>{_esc(opportunity.get("description") or "")}</p>
+          {_list_section("Indicators from brief", opportunity.get("indicators") or [])}
+        </section>"""
+
+    steps_html = "".join(_render_step(step, i) for i, step in enumerate(steps, 1))
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{_esc(title)} — Prelytical Investigation</title>
+  <style>
+    :root {{
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e7ecf3;
+      --muted: #9aa8bc;
+      --accent: #3b82f6;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --border: #2d3a4f;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      margin: 0;
+      padding: 2rem;
+    }}
+    .wrap {{ max-width: 1100px; margin: 0 auto; }}
+    h1 {{ font-size: 1.75rem; margin: 0 0 0.25rem; }}
+    .meta {{ color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }}
+    .card {{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+    }}
+    h2 {{ font-size: 1.15rem; margin: 0 0 0.75rem; color: #cbd5e1; }}
+    h3 {{ font-size: 1rem; margin: 0 0 0.5rem; }}
+    ul {{ margin: 0.25rem 0 0; padding-left: 1.25rem; }}
+    li {{ margin: 0.35rem 0; }}
+    .pill {{
+      display: inline-block;
+      background: #243044;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.15rem 0.65rem;
+      font-size: 0.8rem;
+      margin: 0.15rem 0.25rem 0.15rem 0;
+    }}
+    .pill.mode {{ background: #1e3a5f; border-color: #2563eb; color: #93c5fd; }}
+    code, pre {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+    }}
+    pre {{
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+    }}
+    th, td {{
+      border: 1px solid var(--border);
+      padding: 0.45rem 0.6rem;
+      text-align: left;
+    }}
+    th {{ background: #243044; }}
+    tr:nth-child(even) td {{ background: rgba(255,255,255,0.02); }}
+    .chart {{ margin-top: 0.75rem; }}
+    .bar-row {{ display: flex; align-items: center; gap: 0.5rem; margin: 0.35rem 0; font-size: 0.82rem; }}
+    .bar-label {{ flex: 0 0 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }}
+    .bar-track {{ flex: 1; background: #0b1220; border-radius: 4px; height: 18px; overflow: hidden; }}
+    .bar-fill {{ background: linear-gradient(90deg, #2563eb, #3b82f6); height: 100%; border-radius: 4px; min-width: 2px; }}
+    .bar-value {{ flex: 0 0 80px; text-align: right; font-variant-numeric: tabular-nums; }}
+    .step-meta {{ color: var(--muted); font-size: 0.85rem; }}
+    .error {{ color: #fca5a5; }}
+    .ok {{ color: var(--ok); }}
+  </style>
+</head>
+<body>
+  <div class="wrap prelytical-investigation-report">
+    <h1>{_esc(title)}</h1>
+    <p class="meta">
+      Database: {_esc(database_name)} · Generated {generated}
+      · <span class="pill mode">{_esc(mode)}</span>
+      {f"· Brief: {_esc(brief_title)}" if brief_title else ""}
+    </p>
+
+    <section class="card">
+      <h2>Your question</h2>
+      <p>{_esc(user_question)}</p>
+    </section>
+
+    {opp_block}
+
+    <section class="card">
+      <h2>Executive summary</h2>
+      <p>{exec_summary}</p>
+      {f"<h3>Key findings</h3><ul>{findings_html}</ul>" if findings_html else ""}
+      {_pill_row("Tables used", tables_used)}
+      {_pill_row("Indicators validated in data", indicators)}
+      {_list_section("Caveats", caveats)}
+      {_list_section("Recommended next steps", next_steps)}
+    </section>
+
+    <section class="card">
+      <h2>Investigation steps ({len(steps)})</h2>
+      {steps_html or "<p>No queries executed.</p>"}
+    </section>
+  </div>
+</body>
+</html>"""
+
+
+def _render_step(step: Dict[str, Any], index: int) -> str:
+    purpose = _esc(step.get("purpose") or f"Step {index}")
+    sql = _esc(step.get("sql") or "")
+    row_count = step.get("row_count", 0)
+    error = step.get("error")
+    status = f'<span class="error">Failed: {_esc(error)}</span>' if error else f'<span class="ok">{row_count} rows</span>'
+
+    table_html = _render_data_table(step.get("columns") or [], step.get("rows") or [])
+    chart_html = _render_bar_chart(step.get("columns") or [], step.get("rows") or [])
+
+    return f"""
+    <div class="step" style="margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border);">
+      <h3>Step {index}: {purpose}</h3>
+      <p class="step-meta">{status}</p>
+      <pre>{sql}</pre>
+      {chart_html}
+      {table_html}
+    </div>"""
+
+
+def _render_data_table(columns: List[str], rows: List[Dict[str, Any]]) -> str:
+    if not columns or not rows:
+        return ""
+    display_rows = rows[:50]
+    head = "".join(f"<th>{_esc(c)}</th>" for c in columns)
+    body = ""
+    for row in display_rows:
+        body += "<tr>" + "".join(f"<td>{_esc(_cell(row.get(c)))}</td>" for c in columns) + "</tr>"
+    note = f'<p class="step-meta">Showing {len(display_rows)} of {len(rows)} rows</p>' if len(rows) > len(display_rows) else ""
+    return f"{note}<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+
+
+def _render_bar_chart(columns: List[str], rows: List[Dict[str, Any]]) -> str:
+    label_col, value_col = _pick_chart_columns(columns, rows)
+    if not label_col or not value_col:
+        return ""
+
+    pairs: List[Tuple[str, float]] = []
+    for row in rows[:12]:
+        label = _cell(row.get(label_col))
+        val = _to_float(row.get(value_col))
+        if label and val is not None:
+            pairs.append((str(label), val))
+    if len(pairs) < 2:
+        return ""
+
+    max_val = max(v for _, v in pairs) or 1.0
+    bars = []
+    for label, val in pairs:
+        pct = max(2, int(100 * val / max_val))
+        bars.append(
+            f'<div class="bar-row"><span class="bar-label" title="{_esc(label)}">{_esc(label)}</span>'
+            f'<div class="bar-track"><div class="bar-fill" style="width:{pct}%"></div></div>'
+            f'<span class="bar-value">{_esc(_format_num(val))}</span></div>'
+        )
+    return f'<div class="chart"><h3>Chart: {_esc(value_col)} by {_esc(label_col)}</h3>{"".join(bars)}</div>'
+
+
+def _pick_chart_columns(columns: List[str], rows: List[Dict[str, Any]]) -> Tuple[Optional[str], Optional[str]]:
+    if not columns or not rows:
+        return None, None
+    numeric_cols = [c for c in columns if any(_to_float(r.get(c)) is not None for r in rows[:10])]
+    text_cols = [c for c in columns if c not in numeric_cols]
+    if not numeric_cols:
+        return None, None
+    value_col = numeric_cols[0]
+    label_col = text_cols[0] if text_cols else columns[0]
+    if label_col == value_col and len(columns) > 1:
+        label_col = columns[0] if columns[0] != value_col else columns[1]
+    return label_col, value_col
+
+
+def _list_section(title: str, items: List[str]) -> str:
+    if not items:
+        return ""
+    lis = "".join(f"<li>{_esc(x)}</li>" for x in items if x)
+    return f"<h3>{_esc(title)}</h3><ul>{lis}</ul>" if lis else ""
+
+
+def _pill_row(title: str, items: List[str]) -> str:
+    if not items:
+        return ""
+    pills = "".join(f'<span class="pill">{_esc(x)}</span>' for x in items if x)
+    return f"<h3>{_esc(title)}</h3><p>{pills}</p>" if pills else ""
+
+
+def _esc(value: Any) -> str:
+    return html.escape(str(value if value is not None else ""))
+
+
+def _cell(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _to_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace(",", "")
+    if re.match(r"^-?\d+(\.\d+)?$", text):
+        try:
+            return float(text)
+        except ValueError:
+            return None
+    return None
+
+
+def _format_num(value: float) -> str:
+    if abs(value) >= 1000:
+        return f"{value:,.0f}"
+    if value == int(value):
+        return str(int(value))
+    return f"{value:,.2f}"

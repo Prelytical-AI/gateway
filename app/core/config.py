@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     brief_max_table_inventory: int = Field(default=60, alias="BRIEF_MAX_TABLE_INVENTORY")
     brief_max_entities: int = Field(default=40, alias="BRIEF_MAX_ENTITIES")
     brief_export_path: str = Field(default="", alias="BRIEF_EXPORT_PATH")
+    deep_dive_max_queries: int = Field(default=5, alias="DEEP_DIVE_MAX_QUERIES")
+    deep_dive_timeout_seconds: int = Field(default=900, alias="DEEP_DIVE_TIMEOUT_SECONDS")
+    chat_max_messages: int = Field(default=40, alias="CHAT_MAX_MESSAGES")
+    chat_max_attachment_bytes: int = Field(default=2_000_000, alias="CHAT_MAX_ATTACHMENT_BYTES")
 
     audit_db_path: str = Field(default="./prelytical_audit.sqlite3", alias="AUDIT_DB_PATH")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
@@ -92,6 +96,8 @@ class Settings(BaseSettings):
         "brief_max_table_inventory",
         "brief_max_entities",
         "model_max_schema_objects",
+        "deep_dive_max_queries",
+        "chat_max_messages",
         mode="after",
     )
     @classmethod

@@ -16,6 +16,10 @@ from app.services.model_client import ModelClient
 from app.services.brief_builder import build_brief_prompt, parse_brief_json
 from app.services.brief_export import export_brief_html
 from app.services.brief_renderer import normalize_and_render_brief
+from app.services.brief_session import brief_session
+from app.services.chat_agent import ChatAgent
+from app.services.chat_store import ChatStore
+from app.services.deep_dive import InvestigationService
 from app.services.prompt_builder import (
     build_blocked_answer,
     build_sql_generation_prompt,
@@ -30,6 +34,20 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 audit = AuditService()
 sql_service = SQLServerService()
 model_client = ModelClient()
+investigation_service = InvestigationService(
+    sql_service=sql_service,
+    model_client=model_client,
+    audit=audit,
+)
+chat_store = ChatStore(max_messages=settings.chat_max_messages)
+chat_agent = ChatAgent(
+    chat_store=chat_store,
+    brief_session=brief_session,
+    sql_service=sql_service,
+    model_client=model_client,
+    investigation_service=investigation_service,
+    audit=audit,
+)
 
 
 class AskRequest(BaseModel):
@@ -51,6 +69,28 @@ class BriefRequest(BaseModel):
     )
     business_context: Optional[str] = Field(default=None, max_length=8000)
     audience: str = Field(default="Executives and analytics leaders", max_length=500)
+
+
+class BriefImportRequest(BaseModel):
+    html: Optional[str] = Field(default=None, max_length=2_000_000)
+    json_text: Optional[str] = Field(default=None, max_length=2_000_000)
+    title: Optional[str] = Field(default=None, max_length=200)
+    use_last_generated: bool = False
+
+
+class InvestigateRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=8000)
+    opportunity_index: Optional[int] = Field(default=None, ge=1, le=20)
+
+
+class ChatAttachment(BaseModel):
+    filename: str = Field(default="attachment", max_length=255)
+    content: str = Field(max_length=2_000_000)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(default="", max_length=8000)
+    attachments: List[ChatAttachment] = Field(default_factory=list)
 
 
 def create_app() -> FastAPI:
@@ -88,7 +128,41 @@ def create_app() -> FastAPI:
             "brief_max_table_inventory": settings.brief_max_table_inventory,
             "brief_max_entities": settings.brief_max_entities,
             "sqlserver_driver": settings.sqlserver_driver,
+            "deep_dive_max_queries": settings.deep_dive_max_queries,
+            "chat_max_messages": settings.chat_max_messages,
         }
+
+    @app.get("/api/chat/history")
+    def chat_history() -> Dict[str, Any]:
+        return {"messages": chat_store.list_messages()}
+
+    @app.post("/api/chat/clear")
+    def chat_clear() -> Dict[str, Any]:
+        chat_store.clear()
+        return {"cleared": True}
+
+    @app.post("/api/chat")
+    def chat_message(request: ChatRequest) -> Dict[str, Any]:
+        attachments = []
+        max_bytes = settings.chat_max_attachment_bytes
+        for att in request.attachments:
+            content = att.content
+            if len(content.encode("utf-8")) > max_bytes:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Attachment {att.filename} exceeds size limit.",
+                )
+            attachments.append({"filename": att.filename, "content": content})
+
+        try:
+            result = chat_agent.handle_message(request.message.strip(), attachments)
+            return result
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.exception("Chat failed")
+            audit.log_event("error", question=request.message, metadata={"stage": "chat", "error": str(exc)})
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.get("/api/schema")
     def get_schema() -> Dict[str, Any]:
@@ -178,6 +252,12 @@ def create_app() -> FastAPI:
                     "export_error": export_error,
                 },
             )
+            brief_session.set_from_generation(
+                title=request.title.strip(),
+                output=output,
+                html_report=output.get("html_report", ""),
+                database_name=settings.sqlserver_database,
+            )
             return {
                 "title": request.title,
                 "output": output,
@@ -187,6 +267,7 @@ def create_app() -> FastAPI:
                 "html_report": output.get("html_report", ""),
                 "export_path": export_path,
                 "export_error": export_error,
+                "brief_session": brief_session.summary(),
             }
         except Exception as exc:
             logger.exception("Brief generation failed")
@@ -195,6 +276,58 @@ def create_app() -> FastAPI:
                 question=request.objective,
                 metadata={"stage": "brief", "error": str(exc)},
             )
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.get("/api/brief/session")
+    def get_brief_session() -> Dict[str, Any]:
+        return brief_session.summary()
+
+    @app.post("/api/brief/import")
+    def import_brief(request: BriefImportRequest) -> Dict[str, Any]:
+        try:
+            if request.use_last_generated and brief_session.is_loaded():
+                return {"brief_session": brief_session.summary(), "message": "Brief already loaded."}
+
+            html = request.html.strip() if request.html else None
+            json_text = request.json_text.strip() if request.json_text else None
+            if not html and not json_text:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Provide html or json_text, or generate a brief first.",
+                )
+            summary = brief_session.import_content(
+                html=html,
+                json_text=json_text,
+                title=request.title,
+                database_name=settings.sqlserver_database,
+            )
+            audit.log_event(
+                "brief_imported",
+                metadata={"opportunity_count": summary.get("opportunity_count", 0)},
+            )
+            return {"brief_session": summary}
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.exception("Brief import failed")
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/investigate")
+    def investigate(request: InvestigateRequest) -> Dict[str, Any]:
+        question = request.question.strip()
+        audit.log_event("investigation_requested", question=question)
+        try:
+            result = investigation_service.run(
+                question=question,
+                opportunity_index=request.opportunity_index,
+                brief_session=brief_session,
+            )
+            return result
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.exception("Investigation failed")
+            audit.log_event("error", question=question, metadata={"stage": "investigate", "error": str(exc)})
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.post("/api/sql/validate")
