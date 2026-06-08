@@ -56,7 +56,10 @@ Return ONLY valid JSON:
   "recommended_next_steps": ["action 1"]
 }
 
-Be factual. Do not invent numbers not present in the step results."""
+CRITICAL:
+- If any step has an "error" or zero successful queries with rows, say so clearly.
+- Do NOT invent metrics, rankings, or insights not present in the step results.
+- If all queries failed, executive_summary must state that no data was retrieved and why."""
 
 
 SQL_INVESTIGATION_SYSTEM = """You are a SQL Server analyst inside a private, read-only analytics gateway.
@@ -64,6 +67,8 @@ SQL_INVESTIGATION_SYSTEM = """You are a SQL Server analyst inside a private, rea
 Rules:
 - Generate exactly one SQL Server SELECT statement.
 - Use only the provided schemas, views, and columns.
+- ALWAYS schema-qualify tables in FROM/JOIN: dbo.Orders, ai.vw_demo_sales_summary (never bare Orders).
+- You may define short aliases AFTER the table (e.g. dbo.Orders o) and use them for columns (o.revenue).
 - Prefer aggregates first; use row-level SELECT only when needed for examples (always with TOP).
 - Do not query raw sensitive/PII columns.
 - No INSERT, UPDATE, DELETE, MERGE, DROP, ALTER, TRUNCATE, CREATE, EXEC.

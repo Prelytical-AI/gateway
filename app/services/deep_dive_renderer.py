@@ -37,6 +37,14 @@ def render_investigation_html(
         </section>"""
 
     steps_html = "".join(_render_step(step, i) for i, step in enumerate(steps, 1))
+    ok_steps = [s for s in steps if not s.get("error")]
+    failure_banner = ""
+    if steps and not ok_steps:
+        failure_banner = """
+    <section class="card failure-banner">
+      <h2>No data retrieved</h2>
+      <p>Every query in this investigation failed. Findings below are not validated against live data.</p>
+    </section>"""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -123,6 +131,8 @@ def render_investigation_html(
     .step-meta {{ color: var(--muted); font-size: 0.85rem; }}
     .error {{ color: #fca5a5; }}
     .ok {{ color: var(--ok); }}
+    .failure-banner {{ border-color: #f87171; background: #2a1515; }}
+    .failure-banner h2 {{ color: #fca5a5; }}
   </style>
 </head>
 <body>
@@ -133,6 +143,8 @@ def render_investigation_html(
       · <span class="pill mode">{_esc(mode)}</span>
       {f"· Brief: {_esc(brief_title)}" if brief_title else ""}
     </p>
+
+    {failure_banner}
 
     <section class="card">
       <h2>Your question</h2>

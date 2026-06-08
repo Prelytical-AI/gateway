@@ -47,7 +47,21 @@ FORBIDDEN_PATTERNS = [
 THREE_PART_NAME = re.compile(
     r"\b([A-Za-z_][\w$]*)\.([A-Za-z_][\w$]*)\.([A-Za-z_][\w$]*)\b"
 )
-TWO_PART_NAME = re.compile(r"\b([A-Za-z_][\w$]*)\.([A-Za-z_][\w$]*)\b")
+
+# Table refs in FROM/JOIN — schema.table [AS alias]
+FROM_JOIN_TABLE = re.compile(
+    r"\b(?:FROM|JOIN)\s+"
+    r"(?:(\[([^\]]+)\]|(?P<schema>\w+))\.)?"
+    r"(?:\[([^\]]+)\]|(?P<table>\w+))"
+    r"(?:\s+(?:AS\s+)?(?P<alias>\w+))?",
+    re.IGNORECASE,
+)
+
+TABLE_REF_STOP_WORDS = frozenset({
+    "on", "where", "group", "order", "having", "left", "right", "inner", "outer",
+    "cross", "join", "union", "full", "and", "or", "set", "into", "as", "select",
+    "with", "by", "limit", "offset", "fetch", "case", "when", "then", "else", "end",
+})
 
 SELECT_TOP_PATTERN = re.compile(r"^\s*select\s+(?:distinct\s+)?top\s+\d+\b", re.IGNORECASE)
 SELECT_STAR_PATTERN = re.compile(r"^\s*select\s+\*\s+from\b", re.IGNORECASE)
@@ -225,20 +239,36 @@ def _append_top_limit(sql: str, max_rows: int) -> ValidationResult:
 
 
 def _extract_schema_references(sql: str) -> List[str]:
-    schemas: set[str] = set()
-    three_part_spans: List[tuple[int, int]] = []
+    """Extract schema names from FROM/JOIN table references only.
 
-    for match in THREE_PART_NAME.finditer(sql):
-        schemas.add(match.group(2))
-        three_part_spans.append(match.span())
-
-    for match in TWO_PART_NAME.finditer(sql):
-        start, _ = match.span()
-        if any(start >= span[0] and start < span[1] for span in three_part_spans):
-            continue
-        schemas.add(match.group(1))
-
+    Do not scan alias.column patterns (e.g. o.revenue) — that falsely treats
+    single-letter aliases as schema names.
+    """
+    schemas, _aliases = _extract_from_join_refs(sql)
     return sorted(schemas)
+
+
+def _extract_from_join_refs(sql: str) -> tuple[set[str], set[str]]:
+    schemas: set[str] = set()
+    aliases: set[str] = set()
+
+    for match in FROM_JOIN_TABLE.finditer(sql):
+        schema = match.group("schema") or match.group(2)
+        table = match.group("table") or match.group(3)
+        alias = match.group("alias")
+        if not table:
+            continue
+        table_lower = table.lower()
+        if table_lower in TABLE_REF_STOP_WORDS:
+            continue
+        if schema:
+            schemas.add(schema)
+        if alias:
+            alias_lower = alias.lower()
+            if alias_lower not in TABLE_REF_STOP_WORDS and alias_lower != table_lower:
+                aliases.add(alias_lower)
+
+    return schemas, aliases
 
 
 def _has_cross_database_reference(sql: str, cfg: Settings) -> bool:

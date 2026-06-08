@@ -281,62 +281,78 @@ class InvestigationService:
     ) -> Dict[str, Any]:
         purpose = planned.get("purpose") or "Query"
         question_for_sql = planned.get("question_for_sql") or purpose
+        last_error: Optional[str] = None
 
-        system, user = build_investigation_sql_prompt(
-            question_for_sql=question_for_sql,
-            schema_metadata=schema_metadata,
-            max_rows=self.config.sqlserver_max_rows,
-            max_schema_objects=self.config.model_max_schema_objects,
-            prior_steps=prior_steps,
-        )
-        generated = self.model_client.generate_sql(system, user)
-        validation = validate_sql(generated)
+        for attempt in range(2):
+            system, user = build_investigation_sql_prompt(
+                question_for_sql=question_for_sql,
+                schema_metadata=schema_metadata,
+                max_rows=self.config.sqlserver_max_rows,
+                max_schema_objects=self.config.model_max_schema_objects,
+                prior_steps=prior_steps,
+            )
+            if last_error:
+                user += (
+                    f"\n\nPrevious SQL failed validation or execution:\n{last_error}\n"
+                    "Fix the query. Use schema-qualified table names (dbo.Table, ai.view)."
+                )
+            generated = self.model_client.generate_sql(system, user)
+            validation = validate_sql(generated)
 
-        step: Dict[str, Any] = {
-            "purpose": purpose,
-            "question_for_sql": question_for_sql,
-            "sql": validation.normalized_sql or generated,
-            "valid": validation.valid,
-            "row_count": 0,
-            "columns": [],
-            "rows": [],
-        }
+            step: Dict[str, Any] = {
+                "purpose": purpose,
+                "question_for_sql": question_for_sql,
+                "sql": validation.normalized_sql or generated,
+                "valid": validation.valid,
+                "row_count": 0,
+                "columns": [],
+                "rows": [],
+            }
 
-        if not validation.valid:
-            step["error"] = validation.blocked_reason or "SQL validation failed"
-            self.audit.log_event(
-                "sql_validation_blocked",
-                generated_sql=generated,
-                blocked_reason=step["error"],
-                metadata={"investigation_step": purpose},
-            )
-            return step
+            if not validation.valid:
+                last_error = validation.blocked_reason or "SQL validation failed"
+                step["error"] = last_error
+                if attempt == 0:
+                    continue
+                self.audit.log_event(
+                    "sql_validation_blocked",
+                    generated_sql=generated,
+                    blocked_reason=step["error"],
+                    metadata={"investigation_step": purpose},
+                )
+                return step
 
-        try:
-            result = self.sql_service.execute_readonly_query(validation.normalized_sql)
-            step.update(
-                {
-                    "sql": validation.normalized_sql,
-                    "row_count": result["row_count"],
-                    "columns": result["columns"],
-                    "rows": result["rows"],
-                    "truncated": result.get("truncated", False),
-                }
-            )
-            self.audit.log_event(
-                "sql_executed",
-                generated_sql=validation.normalized_sql,
-                row_count=result["row_count"],
-                metadata={"investigation_step": purpose},
-            )
-        except Exception as exc:
-            logger.exception("Investigation query failed")
-            step["error"] = str(exc)
-            self.audit.log_event(
-                "error",
-                generated_sql=validation.normalized_sql,
-                metadata={"investigation_step": purpose, "error": str(exc)},
-            )
+            try:
+                result = self.sql_service.execute_readonly_query(validation.normalized_sql)
+                step.update(
+                    {
+                        "sql": validation.normalized_sql,
+                        "row_count": result["row_count"],
+                        "columns": result["columns"],
+                        "rows": result["rows"],
+                        "truncated": result.get("truncated", False),
+                    }
+                )
+                self.audit.log_event(
+                    "sql_executed",
+                    generated_sql=validation.normalized_sql,
+                    row_count=result["row_count"],
+                    metadata={"investigation_step": purpose},
+                )
+                return step
+            except Exception as exc:
+                logger.exception("Investigation query failed")
+                last_error = str(exc)
+                step["error"] = last_error
+                if attempt == 0:
+                    continue
+                self.audit.log_event(
+                    "error",
+                    generated_sql=validation.normalized_sql,
+                    metadata={"investigation_step": purpose, "error": str(exc)},
+                )
+                return step
+
         return step
 
     def _synthesize(
@@ -360,8 +376,24 @@ class InvestigationService:
             timeout_seconds=self.config.deep_dive_timeout_seconds,
         )
         synthesis = extract_json_object(raw)
-        if not synthesis.get("executive_summary"):
-            ok_steps = [s for s in steps if not s.get("error")]
+        ok_steps = [s for s in steps if not s.get("error")]
+        if not ok_steps:
+            errors = [s.get("error") for s in steps if s.get("error")]
+            synthesis = {
+                "title": synthesis.get("title") or "Investigation — queries did not return data",
+                "executive_summary": (
+                    "No query returned data. All investigation steps failed — see errors below. "
+                    "Do not treat any narrative above as validated findings."
+                ),
+                "key_findings": [f"Query failed: {e}" for e in errors[:5]],
+                "tables_used": synthesis.get("tables_used") or [],
+                "indicators_validated": [],
+                "caveats": ["Investigation could not validate brief indicators against live data."],
+                "recommended_next_steps": [
+                    "Retry after guardrail/SQL fix, or simplify to a single-table aggregate query.",
+                ],
+            }
+        elif not synthesis.get("executive_summary"):
             synthesis["executive_summary"] = (
                 f"Completed {len(ok_steps)} of {len(steps)} planned queries against "
                 f"{self.config.sqlserver_database}."

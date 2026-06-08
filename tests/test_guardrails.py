@@ -1,6 +1,12 @@
 import pytest
 
+from app.core.config import Settings
 from app.services.guardrails import validate_sql
+
+DBO_ALLOWED = Settings.model_construct(
+    sqlserver_allowed_schemas="ai,dbo",
+    sqlserver_blocked_schemas="sys,INFORMATION_SCHEMA",
+)
 
 
 @pytest.mark.parametrize(
@@ -28,6 +34,34 @@ def test_guardrails(sql, expect_valid, reason_fragment):
         assert "TOP" in result.normalized_sql.upper()
     if reason_fragment:
         assert result.blocked_reason and reason_fragment.lower() in result.blocked_reason.lower()
+
+
+def test_table_aliases_not_treated_as_schemas():
+    sql = (
+        "SELECT TOP 10 o.customer_id, SUM(o.revenue) AS total "
+        "FROM dbo.Orders o GROUP BY o.customer_id ORDER BY total DESC"
+    )
+    result = validate_sql(sql, DBO_ALLOWED)
+    assert result.valid, result.blocked_reason
+
+
+def test_join_aliases_not_treated_as_schemas():
+    sql = (
+        "SELECT TOP 10 c.name, COUNT(o.id) AS orders "
+        "FROM dbo.Customers c JOIN dbo.Orders o ON c.id = o.customer_id "
+        "GROUP BY c.name"
+    )
+    result = validate_sql(sql, DBO_ALLOWED)
+    assert result.valid, result.blocked_reason
+
+
+def test_ai_view_alias():
+    sql = (
+        "SELECT TOP 5 v.region, SUM(v.revenue) AS total "
+        "FROM ai.vw_sales_by_region v GROUP BY v.region"
+    )
+    result = validate_sql(sql)
+    assert result.valid, result.blocked_reason
 
 
 def test_top_appended_to_select_star():
