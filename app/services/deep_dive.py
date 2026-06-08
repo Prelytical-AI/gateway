@@ -10,6 +10,7 @@ from app.services.audit import AuditService
 from app.services.brief_session import BriefSessionStore
 from app.services.deep_dive_renderer import render_investigation_html
 from app.services.guardrails import validate_sql
+from app.services.investigation_analysis import summarize_successful_steps
 from app.services.investigation_prompts import (
     build_investigation_sql_prompt,
     build_next_query_prompt,
@@ -121,34 +122,61 @@ class InvestigationService:
         )
 
         for i, planned in enumerate(planned_queries[:max_queries]):
-            purpose = planned.get("purpose") or f"Query {i + 1}"
-            yield progress(f"Running query {i + 1} of {max_queries}: {purpose}")
+            purpose = planned.get("purpose") or f"Analysis {i + 1}"
+            yield progress(f"Analyzing: {purpose}")
             step = self._run_planned_query(planned, schema_metadata, steps)
             steps.append(step)
-            if step.get("error") and i == 0:
-                break
 
         while len(steps) < max_queries and self._should_continue(question, schema_metadata, steps):
-            yield progress("Planning follow-up query…")
+            yield progress("Planning follow-up analysis…")
             next_spec = self._plan_next_query(question, schema_metadata, steps)
             if not next_spec.get("continue"):
                 break
             planned = {
-                "purpose": next_spec.get("purpose") or "Follow-up query",
+                "purpose": next_spec.get("purpose") or "Follow-up analysis",
                 "question_for_sql": next_spec.get("question_for_sql") or question,
             }
-            yield progress(f"Running follow-up: {planned['purpose']}")
+            yield progress(f"Analyzing: {planned['purpose']}")
             step = self._run_planned_query(planned, schema_metadata, steps)
             steps.append(step)
             if next_spec.get("is_final"):
                 break
 
-        yield progress("Synthesizing findings…")
+        failed = [s for s in steps if s.get("error")]
+        ok_count = sum(1 for s in steps if not s.get("error") and s.get("rows"))
+        for failed_step in failed:
+            if len(steps) >= max_queries or ok_count >= max_queries:
+                break
+            purpose = failed_step.get("purpose") or "Follow-up"
+            yield progress(f"Retrying with simpler approach: {purpose}")
+            retry = self._run_planned_query(
+                {
+                    "purpose": purpose,
+                    "question_for_sql": (
+                        f"Simplified analysis: {failed_step.get('question_for_sql') or purpose}. "
+                        "Use one ai view or one dbo table only, no joins."
+                    ),
+                },
+                schema_metadata,
+                [s for s in steps if not s.get("error")],
+                force_simplify=True,
+            )
+            steps.append(retry)
+            if not retry.get("error"):
+                ok_count += 1
+
+        ok_steps = [s for s in steps if not s.get("error") and s.get("rows")]
+        python_highlights = summarize_successful_steps(ok_steps)
+
+        yield progress("Writing executive report…")
         synthesis = self._synthesize(
             question=question,
             mode=mode,
             opportunity=opportunity,
-            steps=steps,
+            steps=ok_steps,
+            approach_summary=plan.get("approach_summary", ""),
+            python_highlights=python_highlights,
+            attempted_count=len(steps),
         )
 
         report_title = synthesis.get("title") or plan.get("investigation_title") or "Data Investigation"
@@ -159,7 +187,7 @@ class InvestigationService:
             user_question=question,
             mode=mode,
             synthesis=synthesis,
-            steps=steps,
+            evidence_steps=ok_steps,
             brief_title=brief_title,
             opportunity=opportunity,
         )
@@ -182,9 +210,11 @@ class InvestigationService:
             "approach_summary": plan.get("approach_summary", ""),
             "executive_summary": synthesis.get("executive_summary", ""),
             "key_findings": synthesis.get("key_findings", []),
-            "steps": steps,
+            "trends_and_patterns": synthesis.get("trends_and_patterns", []),
+            "business_implications": synthesis.get("business_implications", []),
+            "steps": ok_steps,
             "html_report": html_report,
-            "query_count": len(steps),
+            "query_count": len(ok_steps),
         }
 
     def _resolve_mode(
@@ -264,13 +294,11 @@ class InvestigationService:
     ) -> bool:
         if len(steps) >= self.config.deep_dive_max_queries:
             return False
-        if not steps:
-            return True
-        last = steps[-1]
-        if last.get("error"):
-            return len(steps) < 2
-        if last.get("row_count", 0) == 0 and len(steps) < self.config.deep_dive_max_queries:
-            return True
+        ok = [s for s in steps if not s.get("error") and s.get("rows")]
+        if not ok:
+            return len(steps) < self.config.deep_dive_max_queries
+        if len(ok) >= 3:
+            return False
         return len(steps) < max(2, self.config.deep_dive_max_queries - 1)
 
     def _run_planned_query(
@@ -278,28 +306,30 @@ class InvestigationService:
         planned: Dict[str, Any],
         schema_metadata: Dict[str, Any],
         prior_steps: List[Dict[str, Any]],
+        *,
+        force_simplify: bool = False,
     ) -> Dict[str, Any]:
-        purpose = planned.get("purpose") or "Query"
+        purpose = planned.get("purpose") or "Analysis"
         question_for_sql = planned.get("question_for_sql") or purpose
         last_error: Optional[str] = None
+        max_attempts = self.config.deep_dive_sql_max_attempts
+        step: Dict[str, Any] = {}
 
-        for attempt in range(2):
+        for attempt in range(max_attempts):
+            simplify = force_simplify or attempt >= max_attempts - 1
             system, user = build_investigation_sql_prompt(
                 question_for_sql=question_for_sql,
                 schema_metadata=schema_metadata,
                 max_rows=self.config.sqlserver_max_rows,
                 max_schema_objects=self.config.model_max_schema_objects,
                 prior_steps=prior_steps,
+                simplify=simplify,
+                last_error=last_error or "",
             )
-            if last_error:
-                user += (
-                    f"\n\nPrevious SQL failed validation or execution:\n{last_error}\n"
-                    "Fix the query. Use schema-qualified table names (dbo.Table, ai.view)."
-                )
             generated = self.model_client.generate_sql(system, user)
             validation = validate_sql(generated)
 
-            step: Dict[str, Any] = {
+            step = {
                 "purpose": purpose,
                 "question_for_sql": question_for_sql,
                 "sql": validation.normalized_sql or generated,
@@ -311,9 +341,9 @@ class InvestigationService:
 
             if not validation.valid:
                 last_error = validation.blocked_reason or "SQL validation failed"
-                step["error"] = last_error
-                if attempt == 0:
+                if attempt < max_attempts - 1:
                     continue
+                step["error"] = last_error
                 self.audit.log_event(
                     "sql_validation_blocked",
                     generated_sql=generated,
@@ -343,9 +373,9 @@ class InvestigationService:
             except Exception as exc:
                 logger.exception("Investigation query failed")
                 last_error = str(exc)
-                step["error"] = last_error
-                if attempt == 0:
+                if attempt < max_attempts - 1:
                     continue
+                step["error"] = last_error
                 self.audit.log_event(
                     "error",
                     generated_sql=validation.normalized_sql,
@@ -362,12 +392,17 @@ class InvestigationService:
         mode: str,
         opportunity: Optional[Dict[str, Any]],
         steps: List[Dict[str, Any]],
+        approach_summary: str,
+        python_highlights: List[Dict[str, Any]],
+        attempted_count: int,
     ) -> Dict[str, Any]:
         system, user = build_synthesis_prompt(
             user_question=question,
             mode=mode,
             opportunity=opportunity,
             steps=steps,
+            approach_summary=approach_summary,
+            python_highlights=python_highlights,
         )
         raw = self.model_client.chat(
             system=system,
@@ -376,28 +411,31 @@ class InvestigationService:
             timeout_seconds=self.config.deep_dive_timeout_seconds,
         )
         synthesis = extract_json_object(raw)
-        ok_steps = [s for s in steps if not s.get("error")]
-        if not ok_steps:
-            errors = [s.get("error") for s in steps if s.get("error")]
+        if not steps:
             synthesis = {
-                "title": synthesis.get("title") or "Investigation — queries did not return data",
+                "title": synthesis.get("title") or "Analysis — limited data available",
+                "approach_summary": approach_summary or synthesis.get("approach_summary", ""),
                 "executive_summary": (
-                    "No query returned data. All investigation steps failed — see errors below. "
-                    "Do not treat any narrative above as validated findings."
+                    "We could not retrieve enough data to complete this analysis. "
+                    "Try a narrower question or confirm table access."
                 ),
-                "key_findings": [f"Query failed: {e}" for e in errors[:5]],
-                "tables_used": synthesis.get("tables_used") or [],
-                "indicators_validated": [],
-                "caveats": ["Investigation could not validate brief indicators against live data."],
-                "recommended_next_steps": [
-                    "Retry after guardrail/SQL fix, or simplify to a single-table aggregate query.",
-                ],
+                "trends_and_patterns": [],
+                "business_implications": [],
+                "key_findings": [],
+                "tables_used": [],
+                "caveats": ["No successful data pulls in this run."],
+                "recommended_next_steps": ["Retry with a simpler question focused on one metric."],
             }
         elif not synthesis.get("executive_summary"):
             synthesis["executive_summary"] = (
-                f"Completed {len(ok_steps)} of {len(steps)} planned queries against "
-                f"{self.config.sqlserver_database}."
+                f"Analysis completed using {len(steps)} data source(s) from {self.config.sqlserver_database}."
             )
+        if approach_summary and not synthesis.get("approach_summary"):
+            synthesis["approach_summary"] = approach_summary
+        if attempted_count > len(steps) and steps:
+            caveats = list(synthesis.get("caveats") or [])
+            caveats.append("Some planned analyses did not return data; findings reflect successful pulls only.")
+            synthesis["caveats"] = caveats
         return synthesis
 
 

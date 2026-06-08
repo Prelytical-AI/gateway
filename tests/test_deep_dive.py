@@ -46,11 +46,10 @@ def test_parse_brief_html():
     assert any("Revenue" in (o.get("title") or "") for o in parsed["opportunities"])
 
 
-def test_render_investigation_html_includes_chart_and_table():
-    steps = [
+def test_render_investigation_html_executive_layout():
+    evidence_steps = [
         {
             "purpose": "Regional revenue totals",
-            "sql": "SELECT region, SUM(revenue) AS total FROM ai.vw_demo GROUP BY region",
             "row_count": 3,
             "columns": ["region", "total"],
             "rows": [
@@ -66,12 +65,14 @@ def test_render_investigation_html_includes_chart_and_table():
         user_question="Look at item 1 from the brief and run it",
         mode="opportunity",
         synthesis={
-            "executive_summary": "West leads revenue.",
+            "approach_summary": "Compared revenue across regions using aggregated sales data.",
+            "executive_summary": "West leads revenue at $120,000.",
+            "trends_and_patterns": ["West outperforms other regions by 26%."],
+            "business_implications": ["Prioritize West region playbook in underperforming markets."],
             "key_findings": ["West is highest at 120,000"],
             "tables_used": ["ai.vw_demo"],
-            "indicators_validated": ["region", "revenue"],
         },
-        steps=steps,
+        evidence_steps=evidence_steps,
         brief_title="Test Brief",
         opportunity=SAMPLE_BRIEF_OUTPUT["top_signal_opportunities"][0],
     )
@@ -79,6 +80,30 @@ def test_render_investigation_html_includes_chart_and_table():
     assert "bar-fill" in html
     assert "West" in html
     assert "Regional revenue totals" in html
+    assert "Trends &amp; patterns" in html
+    assert "Business implications" in html
+    assert "Investigation steps" not in html
+    assert "Step 1:" not in html
+    assert "<pre>" not in html
+
+
+def test_summarize_successful_steps():
+    from app.services.investigation_analysis import summarize_successful_steps
+
+    steps = [
+        {
+            "purpose": "Sales by category",
+            "columns": ["category_name", "total_revenue"],
+            "rows": [
+                {"category_name": "Analytics", "total_revenue": 727500},
+                {"category_name": "Reporting", "total_revenue": 313250},
+            ],
+        }
+    ]
+    highlights = summarize_successful_steps(steps)
+    assert len(highlights) == 1
+    assert highlights[0]["purpose"] == "Sales by category"
+    assert any("727" in h for h in highlights[0]["highlights"])
 
 
 def test_extract_json_object_from_fenced_response():

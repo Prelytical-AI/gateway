@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     brief_export_path: str = Field(default="", alias="BRIEF_EXPORT_PATH")
     deep_dive_max_queries: int = Field(default=5, alias="DEEP_DIVE_MAX_QUERIES")
     deep_dive_timeout_seconds: int = Field(default=1800, alias="DEEP_DIVE_TIMEOUT_SECONDS")
+    deep_dive_sql_max_attempts: int = Field(default=3, alias="DEEP_DIVE_SQL_MAX_ATTEMPTS")
     chat_max_messages: int = Field(default=40, alias="CHAT_MAX_MESSAGES")
     chat_max_attachment_bytes: int = Field(default=2_000_000, alias="CHAT_MAX_ATTACHMENT_BYTES")
 
@@ -98,6 +99,7 @@ class Settings(BaseSettings):
         "brief_max_entities",
         "model_max_schema_objects",
         "deep_dive_max_queries",
+        "deep_dive_sql_max_attempts",
         "chat_max_messages",
         mode="after",
     )

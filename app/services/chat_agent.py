@@ -294,11 +294,16 @@ class ChatAgent:
             raise RuntimeError("Investigation did not return a result.")
 
         findings = result.get("key_findings") or []
-        findings_text = "\n".join(f"- {f}" for f in findings[:6])
-        content = result.get("executive_summary") or "Investigation complete."
-        if findings_text:
-            content += f"\n\nKey findings:\n{findings_text}"
-        content += f"\n\n({result.get('query_count', 0)} queries executed)"
+        trends = result.get("trends_and_patterns") or []
+        implications = result.get("business_implications") or []
+        content = result.get("executive_summary") or "Analysis complete."
+        if trends:
+            content += "\n\nTrends & patterns:\n" + "\n".join(f"- {t}" for t in trends[:4])
+        if implications:
+            content += "\n\nBusiness implications:\n" + "\n".join(f"- {i}" for i in implications[:4])
+        elif findings:
+            content += "\n\nKey findings:\n" + "\n".join(f"- {f}" for f in findings[:4])
+        content += "\n\nFull report is attached below."
 
         return self.chat_store.add_assistant_message(
             content,
@@ -308,8 +313,6 @@ class ChatAgent:
                 "html_report": result.get("html_report", ""),
                 "download_name": "prelytical-investigation-report.html",
                 "mode": result.get("mode"),
-                "query_count": result.get("query_count"),
-                "steps": result.get("steps"),
             },
         )
 

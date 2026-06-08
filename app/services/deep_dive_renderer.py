@@ -13,18 +13,23 @@ def render_investigation_html(
     user_question: str,
     mode: str,
     synthesis: Dict[str, Any],
-    steps: List[Dict[str, Any]],
+    evidence_steps: List[Dict[str, Any]],
     brief_title: str = "",
     opportunity: Optional[Dict[str, Any]] = None,
 ) -> str:
     generated = datetime.now(timezone.utc).strftime("%B %d, %Y %H:%M UTC")
+    approach = _esc(synthesis.get("approach_summary") or "")
     exec_summary = _esc(synthesis.get("executive_summary") or "")
+    trends = synthesis.get("trends_and_patterns") or []
+    implications = synthesis.get("business_implications") or []
     findings = synthesis.get("key_findings") or []
-    findings_html = "".join(f"<li>{_esc(x)}</li>" for x in findings if x)
     tables_used = synthesis.get("tables_used") or []
-    indicators = synthesis.get("indicators_validated") or []
     caveats = synthesis.get("caveats") or []
     next_steps = synthesis.get("recommended_next_steps") or []
+
+    trends_html = "".join(f"<li>{_esc(x)}</li>" for x in trends if x)
+    implications_html = "".join(f"<li>{_esc(x)}</li>" for x in implications if x)
+    findings_html = "".join(f"<li>{_esc(x)}</li>" for x in findings if x)
 
     opp_block = ""
     if opportunity:
@@ -33,25 +38,24 @@ def render_investigation_html(
           <h2>Brief opportunity</h2>
           <p><strong>{_esc(opportunity.get("title") or "")}</strong></p>
           <p>{_esc(opportunity.get("description") or "")}</p>
-          {_list_section("Indicators from brief", opportunity.get("indicators") or [])}
         </section>"""
 
-    steps_html = "".join(_render_step(step, i) for i, step in enumerate(steps, 1))
-    ok_steps = [s for s in steps if not s.get("error")]
     failure_banner = ""
-    if steps and not ok_steps:
+    if not evidence_steps:
         failure_banner = """
     <section class="card failure-banner">
-      <h2>No data retrieved</h2>
-      <p>Every query in this investigation failed. Findings below are not validated against live data.</p>
+      <h2>Limited data available</h2>
+      <p>We could not retrieve enough data to produce a full analysis. Consider narrowing the question.</p>
     </section>"""
+
+    evidence_html = "".join(_render_evidence(step) for step in evidence_steps)
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{_esc(title)} — Prelytical Investigation</title>
+  <title>{_esc(title)} — Prelytical</title>
   <style>
     :root {{
       --bg: #0f1419;
@@ -59,8 +63,6 @@ def render_investigation_html(
       --text: #e7ecf3;
       --muted: #9aa8bc;
       --accent: #3b82f6;
-      --ok: #22c55e;
-      --warn: #f59e0b;
       --border: #2d3a4f;
     }}
     * {{ box-sizing: border-box; }}
@@ -83,7 +85,7 @@ def render_investigation_html(
       margin-bottom: 1.25rem;
     }}
     h2 {{ font-size: 1.15rem; margin: 0 0 0.75rem; color: #cbd5e1; }}
-    h3 {{ font-size: 1rem; margin: 0 0 0.5rem; }}
+    h3 {{ font-size: 1rem; margin: 0 0 0.5rem; color: #94a3b8; }}
     ul {{ margin: 0.25rem 0 0; padding-left: 1.25rem; }}
     li {{ margin: 0.35rem 0; }}
     .pill {{
@@ -96,19 +98,6 @@ def render_investigation_html(
       margin: 0.15rem 0.25rem 0.15rem 0;
     }}
     .pill.mode {{ background: #1e3a5f; border-color: #2563eb; color: #93c5fd; }}
-    code, pre {{
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.82rem;
-    }}
-    pre {{
-      background: #0b1220;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }}
     table {{
       width: 100%;
       border-collapse: collapse;
@@ -128,9 +117,9 @@ def render_investigation_html(
     .bar-track {{ flex: 1; background: #0b1220; border-radius: 4px; height: 18px; overflow: hidden; }}
     .bar-fill {{ background: linear-gradient(90deg, #2563eb, #3b82f6); height: 100%; border-radius: 4px; min-width: 2px; }}
     .bar-value {{ flex: 0 0 80px; text-align: right; font-variant-numeric: tabular-nums; }}
-    .step-meta {{ color: var(--muted); font-size: 0.85rem; }}
-    .error {{ color: #fca5a5; }}
-    .ok {{ color: var(--ok); }}
+    .evidence {{ margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }}
+    .evidence:last-child {{ border-bottom: none; margin-bottom: 0; padding-bottom: 0; }}
+    .note {{ color: var(--muted); font-size: 0.85rem; }}
     .failure-banner {{ border-color: #f87171; background: #2a1515; }}
     .failure-banner h2 {{ color: #fca5a5; }}
   </style>
@@ -147,46 +136,45 @@ def render_investigation_html(
     {failure_banner}
 
     <section class="card">
-      <h2>Your question</h2>
+      <h2>Question</h2>
       <p>{_esc(user_question)}</p>
     </section>
 
     {opp_block}
 
+    {f'<section class="card"><h2>Analysis approach</h2><p>{approach}</p></section>' if approach else ""}
+
     <section class="card">
       <h2>Executive summary</h2>
       <p>{exec_summary}</p>
-      {f"<h3>Key findings</h3><ul>{findings_html}</ul>" if findings_html else ""}
-      {_pill_row("Tables used", tables_used)}
-      {_pill_row("Indicators validated in data", indicators)}
-      {_list_section("Caveats", caveats)}
-      {_list_section("Recommended next steps", next_steps)}
     </section>
 
+    {f'<section class="card"><h2>Trends &amp; patterns</h2><ul>{trends_html}</ul></section>' if trends_html else ""}
+
+    {f'<section class="card"><h2>Business implications</h2><ul>{implications_html}</ul></section>' if implications_html else ""}
+
+    {f'<section class="card"><h2>Key findings</h2><ul>{findings_html}</ul></section>' if findings_html else ""}
+
+    {f'<section class="card"><h2>Supporting data</h2>{evidence_html}</section>' if evidence_html else ""}
+
     <section class="card">
-      <h2>Investigation steps ({len(steps)})</h2>
-      {steps_html or "<p>No queries executed.</p>"}
+      {_pill_row("Data sources", tables_used)}
+      {_list_section("Caveats", caveats)}
+      {_list_section("Recommended next steps", next_steps)}
     </section>
   </div>
 </body>
 </html>"""
 
 
-def _render_step(step: Dict[str, Any], index: int) -> str:
-    purpose = _esc(step.get("purpose") or f"Step {index}")
-    sql = _esc(step.get("sql") or "")
-    row_count = step.get("row_count", 0)
-    error = step.get("error")
-    status = f'<span class="error">Failed: {_esc(error)}</span>' if error else f'<span class="ok">{row_count} rows</span>'
-
+def _render_evidence(step: Dict[str, Any]) -> str:
+    purpose = _esc(step.get("purpose") or "Analysis")
     table_html = _render_data_table(step.get("columns") or [], step.get("rows") or [])
     chart_html = _render_bar_chart(step.get("columns") or [], step.get("rows") or [])
 
     return f"""
-    <div class="step" style="margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border);">
-      <h3>Step {index}: {purpose}</h3>
-      <p class="step-meta">{status}</p>
-      <pre>{sql}</pre>
+    <div class="evidence">
+      <h3>{purpose}</h3>
       {chart_html}
       {table_html}
     </div>"""
@@ -200,7 +188,7 @@ def _render_data_table(columns: List[str], rows: List[Dict[str, Any]]) -> str:
     body = ""
     for row in display_rows:
         body += "<tr>" + "".join(f"<td>{_esc(_cell(row.get(c)))}</td>" for c in columns) + "</tr>"
-    note = f'<p class="step-meta">Showing {len(display_rows)} of {len(rows)} rows</p>' if len(rows) > len(display_rows) else ""
+    note = f'<p class="note">Showing {len(display_rows)} of {len(rows)} rows</p>' if len(rows) > len(display_rows) else ""
     return f"{note}<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
 
 
@@ -227,7 +215,7 @@ def _render_bar_chart(columns: List[str], rows: List[Dict[str, Any]]) -> str:
             f'<div class="bar-track"><div class="bar-fill" style="width:{pct}%"></div></div>'
             f'<span class="bar-value">{_esc(_format_num(val))}</span></div>'
         )
-    return f'<div class="chart"><h3>Chart: {_esc(value_col)} by {_esc(label_col)}</h3>{"".join(bars)}</div>'
+    return f'<div class="chart">{"".join(bars)}</div>'
 
 
 def _pick_chart_columns(columns: List[str], rows: List[Dict[str, Any]]) -> Tuple[Optional[str], Optional[str]]:
